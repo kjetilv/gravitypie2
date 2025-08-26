@@ -13,6 +13,7 @@ import javafx.stage.Stage;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.IntFunction;
 import java.util.function.UnaryOperator;
 import java.util.stream.IntStream;
@@ -21,6 +22,10 @@ import java.util.stream.Stream;
 public class Main extends Application {
 
     public static final int COUNT = 5;
+
+    public static final int WORLD_SIZE_X = 1024;
+
+    public static final int WORLD_SIZE_Y = 768;
 
     public static void main(String[] args) {
         launch(args);
@@ -48,7 +53,7 @@ public class Main extends Application {
         this.title = "Stars";
 
         res = objects(i ->
-            new Re(10, 2 * (5 + i), 10)
+            new Re(10, 2 * (5 + i), 5)
         );
 
         positions = objects(_ ->
@@ -80,7 +85,6 @@ public class Main extends Application {
         pl2.setTranslateY(-4000);
         pl2.setTranslateZ(-100);
 
-
         PerspectiveCamera camera = new PerspectiveCamera(true);
         camera.setNearClip(0.01);
         camera.setFarClip(5000);
@@ -97,8 +101,8 @@ public class Main extends Application {
         Group world = new Group(nodes);
         subScene = new SubScene(
             world,
-            1024,
-            1024,
+            WORLD_SIZE_X,
+            WORLD_SIZE_Y,
             true,
             SceneAntialiasing.BALANCED
         );
@@ -109,7 +113,7 @@ public class Main extends Application {
     @Override
     public void start(Stage stage) {
         StackPane root = new StackPane(subScene);
-        Scene scene = new Scene(root, 1024, 768, true);
+        Scene scene = new Scene(root, WORLD_SIZE_X, WORLD_SIZE_Y, true);
         stage.setTitle(title);
         stage.setScene(scene);
         stage.setResizable(true);
@@ -126,13 +130,13 @@ public class Main extends Application {
 
     private void update() {
         for (int i = 0; i < COUNT; i++) {
-            set(spheres.get(i), pos(i));
+            updateSphere(spheres.get(i), pos(i));
         }
         for (int i = 0; i < COUNT; i++) {
-            accelerations.set(i, updatePulls(i));
+            setAcc(i, (index, v) -> updatePulls(index));
         }
         for (int i = 0; i < COUNT; i++) {
-            velocities.set(i, velocities.get(i).plus(accelerations.get(i)));
+            setVel(i, (index, v) -> v.plus(accelerations.get(index)));
         }
         for (int i = 0; i < COUNT; i++) {
             for (int j = i + 1; j < COUNT; j++) {
@@ -140,7 +144,7 @@ public class Main extends Application {
             }
         }
         for (int i = 0; i < COUNT; i++) {
-            positions.set(i, positions.get(i).plus(velocities.get(i)));
+            setPos(i, (index, v) -> v.plus(vel(index)));
         }
     }
 
@@ -185,19 +189,37 @@ public class Main extends Application {
             setPos(j, v -> v.plus(n.mul(jMove)));
 
             double vRelN = vel(i).minus(vel(j)).dot(n);
-            double impulseMagnitude = 0.01 * (-(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass));
+            double impulseMagnitude = 0.1 * (-(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass));
 
             setVel(i, v -> v.plus(n.mul(impulseMagnitude / iMass)));
             setVel(j, v -> v.minus(n.mul(impulseMagnitude / jMass)));
+
+            System.out.println(impulseMagnitude);
         }
     }
 
-    private void setVel(int i, UnaryOperator<Vector> vectorUnaryOperator) {
-        set(velocities, i, vectorUnaryOperator);
+    private void setVel(int i, UnaryOperator<Vector> op) {
+        set(velocities, i, op);
     }
 
-    private void setPos(int i, UnaryOperator<Vector> vectorUnaryOperator) {
-        set(positions, i, vectorUnaryOperator);
+    private void setVel(int i, BiFunction<Integer, Vector, Vector> op) {
+        set(velocities, i, v -> op.apply(i, v));
+    }
+
+    private void setPos(int i, UnaryOperator<Vector> op) {
+        set(positions, i, op);
+    }
+
+    private void setPos(int i, BiFunction<Integer, Vector, Vector> op) {
+        set(positions, i, v -> op.apply(i, v));
+    }
+
+    private void setAcc(int i, UnaryOperator<Vector> op) {
+        set(accelerations, i, op);
+    }
+
+    private void setAcc(int i, BiFunction<Integer, Vector, Vector> op) {
+        set(accelerations, i, v -> op.apply(i, v));
     }
 
     private Re res(int i) {
@@ -233,9 +255,9 @@ public class Main extends Application {
         return IntStream.range(0, COUNT).mapToObj(f);
     }
 
-    private static void set(Node sphere, Vector position) {
-        sphere.setTranslateX(position.x());
-        sphere.setTranslateY(position.y());
-        sphere.setTranslateZ(position.z());
+    private static void updateSphere(Node sphere, Vector pos) {
+        sphere.setTranslateX(pos.x());
+        sphere.setTranslateY(pos.y());
+        sphere.setTranslateZ(pos.z());
     }
 }
