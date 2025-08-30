@@ -7,6 +7,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Material;
 import javafx.scene.paint.PhongMaterial;
+import javafx.scene.shape.Line;
 import javafx.scene.shape.Sphere;
 import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
@@ -27,9 +28,17 @@ public class Main extends Application {
 
     public static final int WORLD_SIZE_Y = 768;
 
+    public static final int WORLD_SIZE_Z = 1024;
+
     public static void main(String[] args) {
         launch(args);
     }
+
+    private Vector cameraLine = new Vector(0, 0, -2400);
+
+    private int cameraSteps = 3600;
+
+    private int cameraStep = cameraSteps / 2;
 
     private final List<Sphere> spheres;
 
@@ -49,11 +58,13 @@ public class Main extends Application {
 
     private final String title;
 
+    private final Camera camera;
+
     public Main() {
         this.title = "Stars";
 
-        res = objects(i ->
-            new Re(10, 2 * (5 + i), 5)
+        res = objects(_ ->
+            new Re(10, 2 * (5 + 5), 5)
         );
 
         positions = objects(_ ->
@@ -70,7 +81,7 @@ public class Main extends Application {
             return sphere;
         });
 
-        blackHolePositions = List.of(new Vector(0, 0, 0));
+        blackHolePositions = List.of(/*new Vector(0, 0, 0)*/);
         blackHoles = List.of(new Re(100, 25, 25));
 
         AmbientLight ambient = new AmbientLight(Color.color(0.3, 0.3, 0.5));
@@ -85,16 +96,61 @@ public class Main extends Application {
         pl2.setTranslateY(-4000);
         pl2.setTranslateZ(-100);
 
-        PerspectiveCamera camera = new PerspectiveCamera(true);
-        camera.setNearClip(0.01);
+        camera = new PerspectiveCamera();
+        camera.setNearClip(1);
         camera.setFarClip(5000);
-        camera.setTranslateZ(-1000); // Move the camera back so it can see the origin
-        camera.setRotationAxis(Rotate.X_AXIS);
         camera.setRotate(0);
+
+        // Create a wireframe cube centered at origin
+        double half = 500; // half-size of the cube edge length 1000
+        Color gridColor = Color.color(0.2, 0.8, 1.0, 0.4);
+        List<Line> wire = new ArrayList<>();
+        // 12 edges of the cube
+        double[] xs = new double[]{-half, half};
+        double[] ys = new double[]{-half, half};
+        double[] zs = new double[]{-half, half};
+        // Edges parallel to X at each combination of y,z
+        for (double y : ys) for (double z : zs) {
+            Line l1 = new Line();
+            l1.setStartX(-half) ;l1.setStartY(0);
+            l1.setEndX(half)    ;l1.setEndY(0);
+            l1.setTranslateY(y);
+            l1.setTranslateZ(z);
+            l1.setStroke(gridColor);
+            wire.add(l1);
+        }
+        // Edges parallel to Y at each combination of x,z
+        for (double x : xs) for (double z : zs) {
+            Line l = new Line();
+            startX(l, 0, -half);
+            l.setEndX(0);   l.setEndY(half);
+            l.setTranslateX(x);
+            l.setTranslateZ(z);
+            l.setStroke(gridColor);
+            wire.add(l);
+        }
+        // Edges parallel to Z at each combination of x,y
+        for (double x : xs) for (double y : ys) {
+            Line l = new Line();
+            // JavaFX 2D Line has no Z endpoints; use translateZ to position a zero-length projection line
+            // Instead, create two small lines to hint depth; but an easier way is to use 3D cylinders.
+            // For minimal change, approximate Z edges by slightly offset X-lines rotated 90deg around Y.
+            // We'll use a Box as invisible helper is overkill; better draw using SubScene camera facing Z.
+            // Workaround: use a 3D Group with a 2D Line rotated around X so length maps to Z visually.
+            // Simpler: draw Z edges as Y lines and rotate 90deg around X to align along Z.
+            startX(l, 0, -half);
+            l.setEndX(0);   l.setEndY(half);
+            l.setTranslateX(x);
+            l.setTranslateY(y);
+            l.setRotationAxis(Rotate.X_AXIS);
+            l.setRotate(90);
+            l.setStroke(gridColor);
+            wire.add(l);
+        }
 
         List<Node> nodes = Stream.concat(
                 Stream.of(ambient, pl1, pl2),
-                spheres.stream()
+                Stream.concat(spheres.stream(), wire.stream())
             )
             .toList();
 
@@ -108,6 +164,10 @@ public class Main extends Application {
         );
         subScene.setFill(Color.BLACK);
         subScene.setCamera(camera);
+    }
+
+    private static void startX(Line l, int x, double y) {
+        l.setStartX(x);l.setStartY(y);
     }
 
     @Override
@@ -133,7 +193,7 @@ public class Main extends Application {
             updateSphere(spheres.get(i), pos(i));
         }
         for (int i = 0; i < COUNT; i++) {
-            setAcc(i, (index, v) -> updatePulls(index));
+            setAcc(i, (index, _) -> updatePulls(index));
         }
         for (int i = 0; i < COUNT; i++) {
             setVel(i, (index, v) -> v.plus(accelerations.get(index)));
@@ -146,6 +206,17 @@ public class Main extends Application {
         for (int i = 0; i < COUNT; i++) {
             setPos(i, (index, v) -> v.plus(vel(index)));
         }
+
+        updateCamera();
+    }
+
+    private void updateCamera() {
+        double angle = 2 * Math.PI * cameraStep / cameraSteps;
+        Vector cameraPos = new Vector(Math.sin(angle) * cameraLine.length(), 0, Math.cos(angle) * cameraLine.length());
+        camera.translateXProperty().set(cameraPos.x());
+        camera.translateYProperty().set(cameraPos.y());
+        camera.translateZProperty().set(cameraPos.z());
+        cameraStep++;
     }
 
     private Vector updatePulls(int i) {
@@ -155,7 +226,7 @@ public class Main extends Application {
             .filter(p -> p != pos)
             .map(other ->
                 other.minus(pos).mul(pullFrom(other, pos, re)));
-        Stream<Vector> blackHolePulls = IntStream.range(0, 1)
+        Stream<Vector> blackHolePulls = IntStream.range(0, blackHolePositions.size())
             .mapToObj(index ->
                 blackHolePositions.get(index)
                     .minus(pos)
@@ -189,12 +260,10 @@ public class Main extends Application {
             setPos(j, v -> v.plus(n.mul(jMove)));
 
             double vRelN = vel(i).minus(vel(j)).dot(n);
-            double impulseMagnitude = 0.1 * (-(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass));
+            double impulseMagnitude = 0.3 * (-(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass));
 
             setVel(i, v -> v.plus(n.mul(impulseMagnitude / iMass)));
             setVel(j, v -> v.minus(n.mul(impulseMagnitude / jMass)));
-
-            System.out.println(impulseMagnitude);
         }
     }
 
