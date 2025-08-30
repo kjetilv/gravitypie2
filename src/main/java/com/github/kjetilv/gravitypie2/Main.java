@@ -27,17 +27,31 @@ public class Main extends Application {
 
     public static final int WORLD_SIZE_X = 1024;
 
+    public static final int X_BOUND = WORLD_SIZE_X / 2;
+
     public static final int WORLD_SIZE_Y = 768;
 
+    public static final int Y_BOUND = WORLD_SIZE_Y / 2;
+
     public static final int WORLD_SIZE_Z = 1024;
+
+    public static final int Z_BOUND = WORLD_SIZE_Z / 2;
+
+    public static final double G = 1;
+
+    public static final double BOUNCE = 1;
+
+    public static final double BOUNCE_BACK = 0.99;
+
+    public static final double BRAKE = .999;
 
     public static void main(String[] args) {
         launch(args);
     }
 
-    private Vector cameraLine = new Vector(0, 0, -2400);
+    private final Vector cameraLine = new Vector(0, 0, -2400);
 
-    private int cameraSteps = 3600;
+    private final int cameraSteps = 3600;
 
     private int cameraStep = cameraSteps / 2;
 
@@ -66,8 +80,8 @@ public class Main extends Application {
     public Main() {
         this.title = "Stars";
 
-        res = objects(_ ->
-            new Re(10, 2 * (5 + 5), 5)
+        res = objects(i ->
+            new Re(10, 2 * (10 + i), 1)
         );
 
         positions = objects(_ ->
@@ -91,7 +105,7 @@ public class Main extends Application {
         blackHolePositions = List.of(/*new Vector(0, 0, 0)*/);
         blackHoles = List.of(new Re(100, 25, 25));
 
-        AmbientLight ambient = new AmbientLight(Color.color(BOUNCE, BOUNCE, 0.5));
+        AmbientLight ambient = new AmbientLight(Color.color(.3, .3, 0.5));
 
         PointLight pl1 = new PointLight(Color.WHITE);
         pl1.setTranslateX(-400);
@@ -109,55 +123,10 @@ public class Main extends Application {
         camera.setRotationAxis(Rotate.Y_AXIS);
         camera.setRotate(0);
 
-        // Create a wireframe cube centered at origin
-        double half = 500; // half-size of the cube edge length 1000
-        Color gridColor = Color.color(0.2, 0.8, 1.0, 0.4);
-        List<Node> wire = new ArrayList<>();
-        // 12 edges of the cube
-        double[] xs = new double[] {-half, half};
-        double[] ys = new double[] {-half, half};
-        double[] zs = new double[] {-half, half};
-        // Edges parallel to X at each combination of y,z
-        for (double y : ys) {
-            for (double z : zs) {
-                Line l = newLine(gridColor);
-                start(l, -half, 0);
-                end(l, half, 0);
-                l.setTranslateY(y);
-                l.setTranslateZ(z);
-                wire.add(l);
-            }
-        }
-        // Edges parallel to Y at each combination of x,z
-        for (double x : xs) {
-            for (double z : zs) {
-                Line l = newLine(gridColor);
-                start(l, 0, -half);
-                end(l, 0, half);
-                l.setTranslateX(x);
-                l.setTranslateZ(z);
-                wire.add(l);
-            }
-        }
-        // Edges parallel to Z at each combination of x,y
-        for (double x : xs) {
-            for (double y : ys) {
-                Line l = newLine(gridColor);
-                // JavaFX 2D Line has no Z endpoints; use translateZ to position a zero-length projection line
-                // Instead, create two small lines to hint depth; but an easier way is to use 3D cylinders.
-                // For minimal change, approximate Z edges by slightly offset X-lines rotated 90deg around Y.
-                // We'll use a Box as invisible helper is overkill; better draw using SubScene camera facing Z.
-                // Workaround: use a 3D Group with a 2D Line rotated around X so length maps to Z visually.
-                // Simpler: draw Z edges as Y lines and rotate 90deg around X to align along Z.
-                start(l, 0, -half);
-                end(l, 0, half);
-                l.setTranslateX(x);
-                l.setTranslateY(y);
-                l.setRotationAxis(Rotate.X_AXIS);
-                l.setRotate(90);
-                wire.add(l);
-            }
-        }
+        // Create a wireframe box centered at origin
+        double half = 500; // half-sizes for x, y, z (keeping the same value preserves previous behavior)
+
+        List<Node> wire = wires(half, half, half);
 
         Stream<Node> nodeStream = Stream.of(
                 Stream.of(ambient, pl1, pl2, origo),
@@ -177,17 +146,6 @@ public class Main extends Application {
         );
         subScene.setFill(Color.BLACK);
         subScene.setCamera(camera);
-    }
-
-    public static final double G = 0.1;
-
-    public static final double BOUNCE = 1;
-
-    private static Line newLine(Color gridColor) {
-        Line l = new Line();
-        l.setStroke(gridColor);
-        l.setStrokeWidth(5d);
-        return l;
     }
 
     @Override
@@ -227,7 +185,37 @@ public class Main extends Application {
             setPos(i, (index, v) -> v.plus(vel(index)));
         }
 
+        for (int i = 0; i < COUNT; i++) {
+            bounce(i);
+        }
+
+        for (int i = 0; i < COUNT; i++) {
+            setVel(i, v -> v.mul(BRAKE));
+        }
+
         moveCamera();
+    }
+
+    private void bounce(int i) {
+        double r = res(i).radius();
+        Vector vel = vel(i);
+        double x = vel.x(), y = vel.y(), z = vel.z();
+        boolean hit = false;
+        if (pos(i).x() < -X_BOUND + r || pos(i).x() > X_BOUND - r) {
+            x = -x;
+            hit = true;
+        }
+        if (pos(i).y() < -Y_BOUND + r || pos(i).y() > Y_BOUND - r) {
+            y = -y;
+            hit = true;
+        }
+        if (pos(i).z() < -Z_BOUND + r || pos(i).z() > Z_BOUND - r) {
+            z = -z;
+            hit = true;
+        }
+        if (hit) {
+            velocities.set(i, new Vector(x, y, z).mul(BOUNCE_BACK));
+        }
     }
 
     private void moveCamera() {
@@ -242,9 +230,6 @@ public class Main extends Application {
         camera.setTranslateX(position.x());
         camera.setTranslateY(position.y());
         camera.setTranslateZ(position.z());
-
-        // Always point the camera towards the origin (0,0,0)
-        // Direction vector from camera to origin
 
         // Compute yaw (rotation around Y axis) and pitch (rotation around X axis)
         double yaw = Math.toDegrees(Math.atan2(-position.x(), -position.z()));
@@ -301,6 +286,10 @@ public class Main extends Application {
         }
     }
 
+    private void setVel(int i, Vector v) {
+        velocities.set(i, v);
+    }
+
     private void setVel(int i, UnaryOperator<Vector> op) {
         set(velocities, i, op);
     }
@@ -335,6 +324,59 @@ public class Main extends Application {
 
     private Vector vel(int i) {
         return velocities.get(i);
+    }
+
+    private static List<Node> wires(double halfX, double halfY, double halfZ) {
+        List<Node> wire = new ArrayList<>();
+        // 12 edges of the box
+        double[] xs = new double[] {-halfX, halfX};
+        double[] ys = new double[] {-halfY, halfY};
+        double[] zs = new double[] {-halfZ, halfZ};
+        // Edges parallel to X at each combination of y,z
+        for (double y : ys) {
+            for (double z : zs) {
+                Line l = newLine();
+                start(l, -halfX, 0);
+                end(l, halfX, 0);
+                l.setTranslateY(y);
+                l.setTranslateZ(z);
+                wire.add(l);
+            }
+        }
+        // Edges parallel to Y at each combination of x,z
+        for (double x : xs) {
+            for (double z : zs) {
+                Line l = newLine();
+                start(l, 0, -halfY);
+                end(l, 0, halfY);
+                l.setTranslateX(x);
+                l.setTranslateZ(z);
+                wire.add(l);
+            }
+        }
+        // Edges parallel to Z at each combination of x,y
+        for (double x : xs) {
+            for (double y : ys) {
+                Line l = newLine();
+                // JavaFX 2D Line has no Z endpoints; approximate Z edges as Y lines rotated around X.
+                start(l, 0, -halfZ);
+                end(l, 0, halfZ);
+                l.setTranslateX(x);
+                l.setTranslateY(y);
+                l.setRotationAxis(Rotate.X_AXIS);
+                l.setRotate(90);
+                wire.add(l);
+            }
+        }
+        return wire;
+    }
+
+    private static Line newLine() {
+        Line l = new Line();
+        Color gridColor = Color.color(0.2, 0.8, 1.0, 0.4);
+        l.setStroke(gridColor);
+        l.setStrokeWidth(5d);
+        return l;
     }
 
     private static void start(Line l, double x, double y) {

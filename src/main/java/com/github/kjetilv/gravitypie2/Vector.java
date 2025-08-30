@@ -51,6 +51,18 @@ record Vector(double x, double y, double z) {
         return new Vector(-x, -y, -z);
     }
 
+    Vector flipX() {
+        return new Vector(-x, y, z);
+    }
+
+    Vector flipY() {
+        return new Vector(x, -y, z);
+    }
+
+    Vector flipZ() {
+        return new Vector(x, y, -z);
+    }
+
     Vector mul(double d) {
         return new Vector(x * d, y * d, z * d);
     }
