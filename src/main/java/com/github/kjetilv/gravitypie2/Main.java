@@ -106,46 +106,52 @@ public class Main extends Application {
         Color gridColor = Color.color(0.2, 0.8, 1.0, 0.4);
         List<Line> wire = new ArrayList<>();
         // 12 edges of the cube
-        double[] xs = new double[]{-half, half};
-        double[] ys = new double[]{-half, half};
-        double[] zs = new double[]{-half, half};
+        double[] xs = new double[] {-half, half};
+        double[] ys = new double[] {-half, half};
+        double[] zs = new double[] {-half, half};
         // Edges parallel to X at each combination of y,z
-        for (double y : ys) for (double z : zs) {
-            Line l1 = new Line();
-            l1.setStartX(-half) ;l1.setStartY(0);
-            l1.setEndX(half)    ;l1.setEndY(0);
-            l1.setTranslateY(y);
-            l1.setTranslateZ(z);
-            l1.setStroke(gridColor);
-            wire.add(l1);
+        for (double y : ys) {
+            for (double z : zs) {
+                Line l = new Line();
+                start(l, -half, 0);
+                end(l, half, 0);
+                l.setTranslateY(y);
+                l.setTranslateZ(z);
+                l.setStroke(gridColor);
+                wire.add(l);
+            }
         }
         // Edges parallel to Y at each combination of x,z
-        for (double x : xs) for (double z : zs) {
-            Line l = new Line();
-            startX(l, 0, -half);
-            l.setEndX(0);   l.setEndY(half);
-            l.setTranslateX(x);
-            l.setTranslateZ(z);
-            l.setStroke(gridColor);
-            wire.add(l);
+        for (double x : xs) {
+            for (double z : zs) {
+                Line l = new Line();
+                start(l, 0, -half);
+                end(l, 0, half);
+                l.setTranslateX(x);
+                l.setTranslateZ(z);
+                l.setStroke(gridColor);
+                wire.add(l);
+            }
         }
         // Edges parallel to Z at each combination of x,y
-        for (double x : xs) for (double y : ys) {
-            Line l = new Line();
-            // JavaFX 2D Line has no Z endpoints; use translateZ to position a zero-length projection line
-            // Instead, create two small lines to hint depth; but an easier way is to use 3D cylinders.
-            // For minimal change, approximate Z edges by slightly offset X-lines rotated 90deg around Y.
-            // We'll use a Box as invisible helper is overkill; better draw using SubScene camera facing Z.
-            // Workaround: use a 3D Group with a 2D Line rotated around X so length maps to Z visually.
-            // Simpler: draw Z edges as Y lines and rotate 90deg around X to align along Z.
-            startX(l, 0, -half);
-            l.setEndX(0);   l.setEndY(half);
-            l.setTranslateX(x);
-            l.setTranslateY(y);
-            l.setRotationAxis(Rotate.X_AXIS);
-            l.setRotate(90);
-            l.setStroke(gridColor);
-            wire.add(l);
+        for (double x : xs) {
+            for (double y : ys) {
+                Line l = new Line();
+                // JavaFX 2D Line has no Z endpoints; use translateZ to position a zero-length projection line
+                // Instead, create two small lines to hint depth; but an easier way is to use 3D cylinders.
+                // For minimal change, approximate Z edges by slightly offset X-lines rotated 90deg around Y.
+                // We'll use a Box as invisible helper is overkill; better draw using SubScene camera facing Z.
+                // Workaround: use a 3D Group with a 2D Line rotated around X so length maps to Z visually.
+                // Simpler: draw Z edges as Y lines and rotate 90deg around X to align along Z.
+                start(l, 0, -half);
+                end(l, 0, half);
+                l.setTranslateX(x);
+                l.setTranslateY(y);
+                l.setRotationAxis(Rotate.X_AXIS);
+                l.setRotate(90);
+                l.setStroke(gridColor);
+                wire.add(l);
+            }
         }
 
         List<Node> nodes = Stream.concat(
@@ -164,10 +170,6 @@ public class Main extends Application {
         );
         subScene.setFill(Color.BLACK);
         subScene.setCamera(camera);
-    }
-
-    private static void startX(Line l, int x, double y) {
-        l.setStartX(x);l.setStartY(y);
     }
 
     @Override
@@ -301,6 +303,16 @@ public class Main extends Application {
 
     private Vector vel(int i) {
         return velocities.get(i);
+    }
+
+    private static void start(Line l, double x, double y) {
+        l.setStartX(x);
+        l.setStartY(y);
+    }
+
+    private static void end(Line l, double x, double y) {
+        l.setEndX(x);
+        l.setEndY(y);
     }
 
     private static List<Vector> zeroes() {
