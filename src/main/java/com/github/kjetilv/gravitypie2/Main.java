@@ -15,6 +15,7 @@ import javafx.stage.Stage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.UnaryOperator;
 import java.util.stream.IntStream;
@@ -58,7 +59,9 @@ public class Main extends Application {
 
     private final String title;
 
-    private final Camera camera;
+    private final PerspectiveCamera camera;
+
+    private final Sphere origo;
 
     public Main() {
         this.title = "Stars";
@@ -81,10 +84,14 @@ public class Main extends Application {
             return sphere;
         });
 
+        origo = new Sphere(4);
+        Material blueMaterial = new PhongMaterial(Color.BLUE);
+        origo.setMaterial(blueMaterial);
+
         blackHolePositions = List.of(/*new Vector(0, 0, 0)*/);
         blackHoles = List.of(new Re(100, 25, 25));
 
-        AmbientLight ambient = new AmbientLight(Color.color(0.3, 0.3, 0.5));
+        AmbientLight ambient = new AmbientLight(Color.color(BOUNCE, BOUNCE, 0.5));
 
         PointLight pl1 = new PointLight(Color.WHITE);
         pl1.setTranslateX(-400);
@@ -96,15 +103,16 @@ public class Main extends Application {
         pl2.setTranslateY(-4000);
         pl2.setTranslateZ(-100);
 
-        camera = new PerspectiveCamera();
+        camera = new PerspectiveCamera(true);
         camera.setNearClip(1);
         camera.setFarClip(5000);
+        camera.setRotationAxis(Rotate.Y_AXIS);
         camera.setRotate(0);
 
         // Create a wireframe cube centered at origin
         double half = 500; // half-size of the cube edge length 1000
         Color gridColor = Color.color(0.2, 0.8, 1.0, 0.4);
-        List<Line> wire = new ArrayList<>();
+        List<Node> wire = new ArrayList<>();
         // 12 edges of the cube
         double[] xs = new double[] {-half, half};
         double[] ys = new double[] {-half, half};
@@ -112,31 +120,29 @@ public class Main extends Application {
         // Edges parallel to X at each combination of y,z
         for (double y : ys) {
             for (double z : zs) {
-                Line l = new Line();
+                Line l = newLine(gridColor);
                 start(l, -half, 0);
                 end(l, half, 0);
                 l.setTranslateY(y);
                 l.setTranslateZ(z);
-                l.setStroke(gridColor);
                 wire.add(l);
             }
         }
         // Edges parallel to Y at each combination of x,z
         for (double x : xs) {
             for (double z : zs) {
-                Line l = new Line();
+                Line l = newLine(gridColor);
                 start(l, 0, -half);
                 end(l, 0, half);
                 l.setTranslateX(x);
                 l.setTranslateZ(z);
-                l.setStroke(gridColor);
                 wire.add(l);
             }
         }
         // Edges parallel to Z at each combination of x,y
         for (double x : xs) {
             for (double y : ys) {
-                Line l = new Line();
+                Line l = newLine(gridColor);
                 // JavaFX 2D Line has no Z endpoints; use translateZ to position a zero-length projection line
                 // Instead, create two small lines to hint depth; but an easier way is to use 3D cylinders.
                 // For minimal change, approximate Z edges by slightly offset X-lines rotated 90deg around Y.
@@ -149,16 +155,17 @@ public class Main extends Application {
                 l.setTranslateY(y);
                 l.setRotationAxis(Rotate.X_AXIS);
                 l.setRotate(90);
-                l.setStroke(gridColor);
                 wire.add(l);
             }
         }
 
-        List<Node> nodes = Stream.concat(
-                Stream.of(ambient, pl1, pl2),
-                Stream.concat(spheres.stream(), wire.stream())
+        Stream<Node> nodeStream = Stream.of(
+                Stream.of(ambient, pl1, pl2, origo),
+                spheres.stream(),
+                wire.stream()
             )
-            .toList();
+            .flatMap(Function.identity());
+        List<Node> nodes = nodeStream.toList();
 
         Group world = new Group(nodes);
         subScene = new SubScene(
@@ -170,6 +177,17 @@ public class Main extends Application {
         );
         subScene.setFill(Color.BLACK);
         subScene.setCamera(camera);
+    }
+
+    public static final double G = 0.1;
+
+    public static final double BOUNCE = 1;
+
+    private static Line newLine(Color gridColor) {
+        Line l = new Line();
+        l.setStroke(gridColor);
+        l.setStrokeWidth(5d);
+        return l;
     }
 
     @Override
@@ -209,16 +227,30 @@ public class Main extends Application {
             setPos(i, (index, v) -> v.plus(vel(index)));
         }
 
-        updateCamera();
+        moveCamera();
     }
 
-    private void updateCamera() {
+    private void moveCamera() {
         double angle = 2 * Math.PI * cameraStep / cameraSteps;
-        Vector cameraPos = new Vector(Math.sin(angle) * cameraLine.length(), 0, Math.cos(angle) * cameraLine.length());
-        camera.translateXProperty().set(cameraPos.x());
-        camera.translateYProperty().set(cameraPos.y());
-        camera.translateZProperty().set(cameraPos.z());
-        cameraStep++;
+        Vector position = new Vector(
+            Math.sin(angle) * cameraLine.length(),
+            0,
+            Math.cos(angle) * cameraLine.length()
+        );
+
+        // Move the camera along the circle around origin
+        camera.setTranslateX(position.x());
+        camera.setTranslateY(position.y());
+        camera.setTranslateZ(position.z());
+
+        // Always point the camera towards the origin (0,0,0)
+        // Direction vector from camera to origin
+
+        // Compute yaw (rotation around Y axis) and pitch (rotation around X axis)
+        double yaw = Math.toDegrees(Math.atan2(-position.x(), -position.z()));
+        camera.setRotate(yaw);
+
+        cameraStep = (cameraStep - 1) % cameraSteps;
     }
 
     private Vector updatePulls(int i) {
@@ -262,7 +294,7 @@ public class Main extends Application {
             setPos(j, v -> v.plus(n.mul(jMove)));
 
             double vRelN = vel(i).minus(vel(j)).dot(n);
-            double impulseMagnitude = 0.3 * (-(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass));
+            double impulseMagnitude = BOUNCE * (-(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass));
 
             setVel(i, v -> v.plus(n.mul(impulseMagnitude / iMass)));
             setVel(j, v -> v.minus(n.mul(impulseMagnitude / jMass)));
@@ -329,7 +361,7 @@ public class Main extends Application {
 
     private static double pullFrom(Vector sPos, Vector pos, Re re) {
         double distance = pos.distanceTo(sPos);
-        return 0.01 * re.weight() / (distance * distance);
+        return G * re.weight() / (distance * distance);
     }
 
     private static <T> Stream<T> stream(IntFunction<T> f) {
