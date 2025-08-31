@@ -23,7 +23,7 @@ import java.util.stream.Stream;
 
 public class Main extends Application {
 
-    public static final int COUNT = 5;
+    public static final int COUNT = 50;
 
     public static final int WORLD_SIZE_X = 1024;
 
@@ -37,13 +37,13 @@ public class Main extends Application {
 
     public static final int Z_BOUND = WORLD_SIZE_Z / 2;
 
-    public static final double G = 1;
+    public static final double G = .075;
 
-    public static final double BOUNCE = 1;
+    public static final double BOUNCE = .75;
 
-    public static final double BOUNCE_BACK = 0.99;
+    public static final double BOUNCE_BACK = .75;
 
-    public static final double BRAKE = .999;
+    public static final double BRAKE = .99;
 
     public static void main(String[] args) {
         launch(args);
@@ -81,7 +81,7 @@ public class Main extends Application {
         this.title = "Stars";
 
         res = objects(i ->
-            new Re(10, 2 * (10 + i), 1)
+            new Re(10,  i + 10, 1)
         );
 
         positions = objects(_ ->
@@ -201,16 +201,25 @@ public class Main extends Application {
         Vector vel = vel(i);
         double x = vel.x(), y = vel.y(), z = vel.z();
         boolean hit = false;
-        if (pos(i).x() < -X_BOUND + r || pos(i).x() > X_BOUND - r) {
-            x = -x;
+        if (pos(i).x() < -X_BOUND + r) {
+            x = Math.abs(x);
+            hit = true;
+        } else if (pos(i).x() > X_BOUND - r) {
+            x = -Math.abs(x);
             hit = true;
         }
-        if (pos(i).y() < -Y_BOUND + r || pos(i).y() > Y_BOUND - r) {
+        if (pos(i).y() < -Y_BOUND + r) {
+            y = Math.abs(y);
+            hit = true;
+        } else if (pos(i).y() > Y_BOUND - r) {
             y = -y;
             hit = true;
         }
-        if (pos(i).z() < -Z_BOUND + r || pos(i).z() > Z_BOUND - r) {
-            z = -z;
+        if (pos(i).z() < -Z_BOUND + r) {
+            z = Math.abs(z);
+            hit = true;
+        } else if (pos(i).z() > Z_BOUND - r) {
+            z = -Math.abs(z);
             hit = true;
         }
         if (hit) {
