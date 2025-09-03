@@ -10,6 +10,10 @@ record Range(double min, double max) {
         this(0d, 0d);
     }
 
+    double point(Rate rate) {
+        return rate.pointBetween(min, max);
+    }
+
     double range() {
         return max - min;
     }
@@ -29,5 +33,9 @@ record Range(double min, double max) {
 
     double zeroToOneValue(double zeroToOne) {
         return min + zeroToOne * range();
+    }
+
+    private static double ranged(double amount) {
+        return Math.max(0, Math.min(1, amount));
     }
 }

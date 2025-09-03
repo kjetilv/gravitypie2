@@ -21,49 +21,31 @@ import java.util.function.UnaryOperator;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static javafx.scene.paint.Color.*;
+
 public class Main extends Application {
-
-    public static final int COUNT = 50;
-
-    public static final int WORLD_SIZE_X = 1024;
-
-    public static final int X_BOUND = WORLD_SIZE_X / 2;
-
-    public static final int WORLD_SIZE_Y = 768;
-
-    public static final int Y_BOUND = WORLD_SIZE_Y / 2;
-
-    public static final int WORLD_SIZE_Z = 1024;
-
-    public static final int Z_BOUND = WORLD_SIZE_Z / 2;
-
-    public static final double G = .075;
-
-    public static final double BOUNCE = .75;
-
-    public static final double BOUNCE_BACK = .75;
-
-    public static final double BRAKE = .99;
 
     public static void main(String[] args) {
         launch(args);
     }
 
-    private final Vector cameraLine = new Vector(0, 0, -2400);
+    private final Vector cameraLine = new Vector(0, 0, -2180);
 
-    private final int cameraSteps = 3600;
-
-    private int cameraStep = cameraSteps / 2;
+    private int cameraStep;
 
     private final List<Sphere> spheres;
 
     private final List<Re> res;
+
+    private final List<Temperature> temperatures;
 
     private final List<Vector> positions;
 
     private final List<Vector> accelerations;
 
     private final List<Vector> velocities;
+
+    private final List<Vector> collisionImpulses;
 
     private final List<Vector> blackHolePositions;
 
@@ -75,13 +57,11 @@ public class Main extends Application {
 
     private final PerspectiveCamera camera;
 
-    private final Sphere origo;
-
     public Main() {
         this.title = "Stars";
 
         res = objects(i ->
-            new Re(10,  i + 10, 1)
+            new Re(10, R_RANGE.point(new Rate(i, 10)), 1)
         );
 
         positions = objects(_ ->
@@ -91,28 +71,34 @@ public class Main extends Application {
 
         velocities = zeroes();
 
+        temperatures = objects(i ->
+            new Temperature(.5));
+
+        collisionImpulses =
+            objects(i -> Vector.ZERO);
+
         spheres = objects(i -> {
             Sphere sphere = new Sphere(res(i).radius());
-            Material redMaterial = new PhongMaterial(Color.RED);
+            Material redMaterial = new PhongMaterial(RED);
             sphere.setMaterial(redMaterial);
             return sphere;
         });
 
-        origo = new Sphere(4);
-        Material blueMaterial = new PhongMaterial(Color.BLUE);
+        Sphere origo = new Sphere(4);
+        Material blueMaterial = new PhongMaterial(BLUE);
         origo.setMaterial(blueMaterial);
 
         blackHolePositions = List.of(/*new Vector(0, 0, 0)*/);
         blackHoles = List.of(new Re(100, 25, 25));
 
-        AmbientLight ambient = new AmbientLight(Color.color(.3, .3, 0.5));
+        AmbientLight ambient = new AmbientLight(color(.3, .3, 0.5));
 
-        PointLight pl1 = new PointLight(Color.WHITE);
+        PointLight pl1 = new PointLight(WHITE);
         pl1.setTranslateX(-400);
         pl1.setTranslateY(400);
         pl1.setTranslateZ(100);
 
-        PointLight pl2 = new PointLight(Color.WHITE);
+        PointLight pl2 = new PointLight(WHITE);
         pl2.setTranslateX(400);
         pl2.setTranslateY(-4000);
         pl2.setTranslateZ(-100);
@@ -123,10 +109,7 @@ public class Main extends Application {
         camera.setRotationAxis(Rotate.Y_AXIS);
         camera.setRotate(0);
 
-        // Create a wireframe box centered at origin
-        double half = 500; // half-sizes for x, y, z (keeping the same value preserves previous behavior)
-
-        List<Node> wire = wires(half, half, half);
+        List<Node> wire = wires(X_BOUND, Y_BOUND, Z_BOUND);
 
         Stream<Node> nodeStream = Stream.of(
                 Stream.of(ambient, pl1, pl2, origo),
@@ -144,7 +127,7 @@ public class Main extends Application {
             true,
             SceneAntialiasing.BALANCED
         );
-        subScene.setFill(Color.BLACK);
+        subScene.setFill(BLACK);
         subScene.setCamera(camera);
     }
 
@@ -168,67 +151,134 @@ public class Main extends Application {
 
     private void update() {
         for (int i = 0; i < COUNT; i++) {
-            updateSphere(spheres.get(i), pos(i));
-        }
-        for (int i = 0; i < COUNT; i++) {
-            setAcc(i, (index, _) -> updatePulls(index));
-        }
-        for (int i = 0; i < COUNT; i++) {
-            setVel(i, (index, v) -> v.plus(accelerations.get(index)));
+            updateAcceleration(i);
         }
         for (int i = 0; i < COUNT; i++) {
             for (int j = i + 1; j < COUNT; j++) {
-                resolveCollision(i, j);
+                handleCollision(i, j);
             }
         }
         for (int i = 0; i < COUNT; i++) {
-            setPos(i, (index, v) -> v.plus(vel(index)));
+            updateVelocity(i);
         }
 
         for (int i = 0; i < COUNT; i++) {
-            bounce(i);
+            updateCollisionImpulse(i);
         }
 
         for (int i = 0; i < COUNT; i++) {
-            setVel(i, v -> v.mul(BRAKE));
+            updatePosition(i);
+        }
+
+        for (int i = 0; i < COUNT; i++) {
+            handleWallBounce(i);
+        }
+
+        for (int i = 0; i < COUNT; i++) {
+            moveSphere(i);
         }
 
         moveCamera();
     }
 
-    private void bounce(int i) {
+    private void updatePosition(int i) {
+        setPos(
+            i,
+            (index, v) ->
+                v.plus(vel(index))
+        );
+    }
+
+    private void updateAcceleration(int i) {
+        setAcc(
+            i,
+            (index, _) ->
+                updatePulls(index)
+        );
+    }
+
+    private void updateVelocity(int i) {
+        setVel(
+            i,
+            (index, v) ->
+                updateVelocity(index, v)
+        );
+    }
+
+    private Vector updateVelocity(Integer index, Vector v) {
+        return v.plus(accelerations.get(index)).mul(AIR_BRAKE);
+    }
+
+    private void updateCollisionImpulse(int i) {
+        setVel(
+            i,
+            (index, v) ->
+                updateCollisionImpulse(index, v)
+        );
+    }
+
+    private Vector updateCollisionImpulse(Integer index, Vector v) {
+        Vector impulse = collisionImpulses.set(index, Vector.ZERO);
+        return v.plus(impulse);
+    }
+
+    private void moveSphere(int i) {
+        Sphere s = spheres.get(i);
+        Vector p = pos(i);
+        s.setTranslateX(p.x());
+        s.setTranslateY(p.y());
+        s.setTranslateZ(p.z());
+    }
+
+    private void handleWallBounce(int i) {
         double r = res(i).radius();
+
         Vector vel = vel(i);
-        double x = vel.x(), y = vel.y(), z = vel.z();
-        boolean hit = false;
-        if (pos(i).x() < -X_BOUND + r) {
-            x = Math.abs(x);
-            hit = true;
-        } else if (pos(i).x() > X_BOUND - r) {
-            x = -Math.abs(x);
-            hit = true;
+        double vx = vel.x(), vy = vel.y(), vz = vel.z();
+
+        Vector pos = pos(i);
+        double px = pos.x(), py = pos.y(), pz = pos.z();
+
+        boolean h = false;
+
+        if (px < -X_BOUND + r) {
+            vx = Math.abs(vx);
+            px = -X_BOUND + r + 1;
+            h = true;
+        } else if (px > X_BOUND - r) {
+            vx = -Math.abs(vx);
+            px = X_BOUND - r - 1;
+            h = true;
         }
-        if (pos(i).y() < -Y_BOUND + r) {
-            y = Math.abs(y);
-            hit = true;
-        } else if (pos(i).y() > Y_BOUND - r) {
-            y = -y;
-            hit = true;
+
+        if (py < -Y_BOUND + r) {
+            vy = Math.abs(vy);
+            py = -Y_BOUND + r + 1;
+            h = true;
+        } else if (py > Y_BOUND - r) {
+            vy = -Math.abs(vy);
+            py = Y_BOUND - r - 1;
+            h = true;
         }
-        if (pos(i).z() < -Z_BOUND + r) {
-            z = Math.abs(z);
-            hit = true;
-        } else if (pos(i).z() > Z_BOUND - r) {
-            z = -Math.abs(z);
-            hit = true;
+
+        if (pz < -Z_BOUND + r) {
+            vz = Math.abs(vz);
+            pz = -Z_BOUND + r + 1;
+            h = true;
+        } else if (pz > Z_BOUND - r) {
+            vz = -Math.abs(vz);
+            pz = Z_BOUND - r - 1;
+            h = true;
         }
-        if (hit) {
-            velocities.set(i, new Vector(x, y, z).mul(BOUNCE_BACK));
+
+        if (h) {
+            velocities.set(i, new Vector(vx, vy, vz).mul(WALL_BRAKE));
+            positions.set(i, new Vector(px, py, pz));
         }
     }
 
     private void moveCamera() {
-        double angle = 2 * Math.PI * cameraStep / cameraSteps;
+        double angle = 2 * Math.PI * cameraStep / CAMERA_STEPS;
         Vector position = new Vector(
             Math.sin(angle) * cameraLine.length(),
             0,
@@ -244,7 +294,7 @@ public class Main extends Application {
         double yaw = Math.toDegrees(Math.atan2(-position.x(), -position.z()));
         camera.setRotate(yaw);
 
-        cameraStep = (cameraStep - 1) % cameraSteps;
+        cameraStep = (cameraStep - 1) % CAMERA_STEPS;
     }
 
     private Vector updatePulls(int i) {
@@ -269,7 +319,7 @@ public class Main extends Application {
             );
     }
 
-    private void resolveCollision(int i, int j) {
+    private void handleCollision(int i, int j) {
         Vector delta = pos(j).minus(pos(i));
         double iR = res(i).radius();
         double jR = res(j).radius();
@@ -288,10 +338,10 @@ public class Main extends Application {
             setPos(j, v -> v.plus(n.mul(jMove)));
 
             double vRelN = vel(i).minus(vel(j)).dot(n);
-            double impulseMagnitude = BOUNCE * (-(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass));
+            double impulseMagnitude = COLLISION_BRAKE * (-(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass));
 
-            setVel(i, v -> v.plus(n.mul(impulseMagnitude / iMass)));
-            setVel(j, v -> v.minus(n.mul(impulseMagnitude / jMass)));
+            setImp(i, (_, v) -> v.plus(n.mul(impulseMagnitude / iMass)));
+            setImp(j, (_, v) -> v.minus(n.mul(impulseMagnitude / jMass)));
         }
     }
 
@@ -315,6 +365,10 @@ public class Main extends Application {
         set(positions, i, v -> op.apply(i, v));
     }
 
+    private void setImp(int i, BiFunction<Integer, Vector, Vector> op) {
+        set(collisionImpulses, i, v -> op.apply(i, v));
+    }
+
     private void setAcc(int i, UnaryOperator<Vector> op) {
         set(accelerations, i, op);
     }
@@ -334,6 +388,32 @@ public class Main extends Application {
     private Vector vel(int i) {
         return velocities.get(i);
     }
+
+    static final int COUNT = 50;
+
+    static final int WORLD_SIZE_X = 1024;
+
+    static final int WORLD_SIZE_Y = 768;
+
+    static final int WORLD_SIZE_Z = 1024;
+
+    static final int X_BOUND = WORLD_SIZE_X / 2;
+
+    static final int Y_BOUND = WORLD_SIZE_Y / 2;
+
+    static final int Z_BOUND = WORLD_SIZE_Z / 2;
+
+    static final double GRAV_CONSTANT = .01;
+
+    static final double COLLISION_BRAKE = .99;
+
+    static final double WALL_BRAKE = .8;
+
+    static final double AIR_BRAKE = .95;
+
+    static final int CAMERA_STEPS = 21600;
+
+    static final Range R_RANGE = new Range(10, 20);
 
     private static List<Node> wires(double halfX, double halfY, double halfZ) {
         List<Node> wire = new ArrayList<>();
@@ -382,7 +462,7 @@ public class Main extends Application {
 
     private static Line newLine() {
         Line l = new Line();
-        Color gridColor = Color.color(0.2, 0.8, 1.0, 0.4);
+        Color gridColor = color(0.2, 0.8, 1.0, 0.4);
         l.setStroke(gridColor);
         l.setStrokeWidth(5d);
         return l;
@@ -412,16 +492,11 @@ public class Main extends Application {
 
     private static double pullFrom(Vector sPos, Vector pos, Re re) {
         double distance = pos.distanceTo(sPos);
-        return G * re.weight() / (distance * distance);
+        return GRAV_CONSTANT * re.weight() / (distance * distance);
     }
 
     private static <T> Stream<T> stream(IntFunction<T> f) {
         return IntStream.range(0, COUNT).mapToObj(f);
     }
 
-    private static void updateSphere(Node sphere, Vector pos) {
-        sphere.setTranslateX(pos.x());
-        sphere.setTranslateY(pos.y());
-        sphere.setTranslateZ(pos.z());
-    }
 }

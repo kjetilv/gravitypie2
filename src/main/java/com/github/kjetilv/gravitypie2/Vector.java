@@ -7,6 +7,8 @@ import static java.lang.Math.sqrt;
 
 record Vector(double x, double y, double z) {
 
+    static Vector ZERO = new Vector();
+
     Vector() {
         this(0d, 0d, 0d);
     }
