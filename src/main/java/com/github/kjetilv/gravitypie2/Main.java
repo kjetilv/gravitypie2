@@ -12,6 +12,8 @@ import javafx.scene.shape.Sphere;
 import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -25,7 +27,7 @@ import static javafx.scene.paint.Color.*;
 
 public class Main extends Application {
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         launch(args);
     }
 
@@ -60,38 +62,42 @@ public class Main extends Application {
     public Main() {
         this.title = "Stars";
 
-        res = objects(i ->
-            new Re(10, R_RANGE.point(new Rate(i, 10)), 1)
+        res = objects(
+            COUNT, i ->
+                new Re(
+                    10,
+                    R_RANGE.point(i, COUNT),
+                    1L,
+                    color(i, COUNT)
+                )
         );
 
-        positions = objects(_ ->
-            new Vector(new Range(-350, 350)));
+        positions = objects(COUNT, _ -> new Vector(new Range(-350, 350)));
 
-        accelerations = zeroes();
+        accelerations = zeroes(COUNT);
 
-        velocities = zeroes();
+        velocities = zeroes(COUNT);
 
-        temperatures = objects(i ->
-            new Temperature(.5));
+        temperatures = objects(COUNT, _ -> new Temperature(ROOM_TEMP));
 
-        collisionImpulses =
-            objects(i -> Vector.ZERO);
-
-        spheres = objects(i -> {
-            Sphere sphere = new Sphere(res(i).radius());
-            Material redMaterial = new PhongMaterial(RED);
-            sphere.setMaterial(redMaterial);
-            return sphere;
-        });
+        collisionImpulses = objects(COUNT, _ -> Vector.ZERO);
+        spheres = objects(
+            COUNT, i -> {
+                Sphere sphere = new Sphere(res(i).radius());
+                Material redMaterial = new PhongMaterial(toRGB(res(i).color()));
+                sphere.setMaterial(redMaterial);
+                return sphere;
+            }
+        );
 
         Sphere origo = new Sphere(4);
-        Material blueMaterial = new PhongMaterial(BLUE);
+        Material blueMaterial = new PhongMaterial(GHOSTWHITE);
         origo.setMaterial(blueMaterial);
 
         blackHolePositions = List.of(/*new Vector(0, 0, 0)*/);
-        blackHoles = List.of(new Re(100, 25, 25));
+        blackHoles = List.of(new Re(100, 25, 25, new Re.Color(0d, 0d, 0d, 1.0d)));
 
-        AmbientLight ambient = new AmbientLight(color(.3, .3, 0.5));
+        AmbientLight ambient = new AmbientLight(Color.color(.3, .3, 0.5));
 
         PointLight pl1 = new PointLight(WHITE);
         pl1.setTranslateX(-400);
@@ -142,9 +148,28 @@ public class Main extends Application {
 
         new AnimationTimer() {
 
+            private final Instant start = Instant.now();
+
+            private Duration total = Duration.ZERO;
+
+            private long frames;
+
+            private long lastSec;
+
             @Override
             public void handle(long l) {
+                Instant before = Instant.now();
                 update();
+                Instant after = Instant.now();
+                total = total.plus(Duration.between(before, after));
+                frames++;
+                long es = after.getEpochSecond();
+                if (es > lastSec) {
+                    double micros = .001d * total.toNanosPart() / frames;
+                    long seconds = Duration.between(start, after).toSeconds();
+                    System.out.printf("%.1fµs fps: %.1f (%d / %s =>)%n", micros, 1d * frames /seconds, frames, total);
+                    lastSec = es;
+                }
             }
         }.start();
     }
@@ -206,7 +231,7 @@ public class Main extends Application {
     }
 
     private Vector updateVelocity(Integer index, Vector v) {
-        return v.plus(accelerations.get(index)).mul(AIR_BRAKE);
+        return v.plus(accelerations.get(index)).mul(AIR_RETAIN);
     }
 
     private void updateCollisionImpulse(int i) {
@@ -272,7 +297,7 @@ public class Main extends Application {
         }
 
         if (h) {
-            velocities.set(i, new Vector(vx, vy, vz).mul(WALL_BRAKE));
+            velocities.set(i, new Vector(vx, vy, vz).mul(WALL_RETAIN));
             positions.set(i, new Vector(px, py, pz));
         }
     }
@@ -331,17 +356,19 @@ public class Main extends Application {
             double iMass = res(i).mass();
             double jMass = res(j).mass();
 
-            double iMove = overlap * iMass / (iMass + jMass);
-            double jMove = overlap * jMass / (iMass + jMass);
+            double totalMass = iMass + jMass;
+            double iMove = overlap * iMass / totalMass;
+            double jMove = overlap * jMass / totalMass;
 
             setPos(i, v -> v.minus(n.mul(iMove)));
             setPos(j, v -> v.plus(n.mul(jMove)));
 
             double vRelN = vel(i).minus(vel(j)).dot(n);
-            double impulseMagnitude = COLLISION_BRAKE * (-(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass));
+            double rawImpulse = -(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass);
+            double impulse = COLLISION_RETAIN * rawImpulse;
 
-            setImp(i, (_, v) -> v.plus(n.mul(impulseMagnitude / iMass)));
-            setImp(j, (_, v) -> v.minus(n.mul(impulseMagnitude / jMass)));
+            setImp(i, (_, v) -> v.plus(n.mul(impulse / jMass)));
+            setImp(j, (_, v) -> v.minus(n.mul(impulse / iMass)));
         }
     }
 
@@ -389,7 +416,7 @@ public class Main extends Application {
         return velocities.get(i);
     }
 
-    static final int COUNT = 50;
+    static final int COUNT = 800;
 
     static final int WORLD_SIZE_X = 1024;
 
@@ -403,17 +430,46 @@ public class Main extends Application {
 
     static final int Z_BOUND = WORLD_SIZE_Z / 2;
 
-    static final double GRAV_CONSTANT = .01;
+    static final double GRAV_CONSTANT = .02;
 
-    static final double COLLISION_BRAKE = .99;
+    static final double COLLISION_RETAIN = .4;
 
-    static final double WALL_BRAKE = .8;
+    static final double WALL_RETAIN = .8;
 
-    static final double AIR_BRAKE = .95;
+    static final double AIR_RETAIN = .9;
 
     static final int CAMERA_STEPS = 21600;
 
-    static final Range R_RANGE = new Range(10, 20);
+    static final double COLOUR_RANGE = 0.85;
+
+    static final Range R_RANGE = new Range(10, 50);
+
+    static final double ROOM_TEMP = 0.25;
+
+    private static Re.Color color(int i, int count) {
+        double ratio = 1d * i / count;
+        double angle = ratio * 3 * Math.PI;
+
+        double r = Math.sin(angle);
+        double g = Math.cos(angle + Math.PI / 2);
+        double b = Math.cos(angle + Math.PI);
+        return new Re.Color(
+            adjust(r),
+            adjust(g),
+            adjust(b),
+            1.0d
+        );
+    }
+
+    private static double adjust(double r) {
+        double raw = Math.max(0, r);
+        double inRange = raw * COLOUR_RANGE;
+        return 1.0 - COLOUR_RANGE + inRange;
+    }
+
+    private static Color toRGB(Re.Color color) {
+        return new Color(color.r(), color.g(), color.b(), color.opa());
+    }
 
     private static List<Node> wires(double halfX, double halfY, double halfZ) {
         List<Node> wire = new ArrayList<>();
@@ -462,7 +518,7 @@ public class Main extends Application {
 
     private static Line newLine() {
         Line l = new Line();
-        Color gridColor = color(0.2, 0.8, 1.0, 0.4);
+        Color gridColor = Color.color(0.2, 0.8, 1.0, 0.4);
         l.setStroke(gridColor);
         l.setStrokeWidth(5d);
         return l;
@@ -478,12 +534,12 @@ public class Main extends Application {
         l.setEndY(y);
     }
 
-    private static List<Vector> zeroes() {
-        return objects(_ -> new Vector());
+    private static List<Vector> zeroes(int count) {
+        return objects(count, _ -> new Vector());
     }
 
-    private static <T> List<T> objects(IntFunction<T> intFunction) {
-        return new ArrayList<>(stream(intFunction).toList());
+    private static <T> List<T> objects(int count, IntFunction<T> intFunction) {
+        return new ArrayList<>(stream(intFunction, count).toList());
     }
 
     private static <T> void set(List<T> list, int i, UnaryOperator<T> transform) {
@@ -495,8 +551,7 @@ public class Main extends Application {
         return GRAV_CONSTANT * re.weight() / (distance * distance);
     }
 
-    private static <T> Stream<T> stream(IntFunction<T> f) {
-        return IntStream.range(0, COUNT).mapToObj(f);
+    private static <T> Stream<T> stream(IntFunction<T> f, int count) {
+        return IntStream.range(0, count).mapToObj(f);
     }
-
 }
