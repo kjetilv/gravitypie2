@@ -31,7 +31,7 @@ public class Main extends Application {
         launch(args);
     }
 
-    private final Vector cameraLine = new Vector(0, 0, -2180);
+    private final Vector cameraLine = new Vector(0, 0, -2.16 * WORLD_SIZE_Z);
 
     private int cameraStep;
 
@@ -100,18 +100,18 @@ public class Main extends Application {
         AmbientLight ambient = new AmbientLight(Color.color(.3, .3, 0.5));
 
         PointLight pl1 = new PointLight(WHITE);
-        pl1.setTranslateX(-400);
-        pl1.setTranslateY(400);
-        pl1.setTranslateZ(100);
+        pl1.setTranslateX(-(.4 * WORLD_SIZE_X));
+        pl1.setTranslateY(.4 * WORLD_SIZE_Y);
+        pl1.setTranslateZ(.1 * WORLD_SIZE_X);
 
         PointLight pl2 = new PointLight(WHITE);
-        pl2.setTranslateX(400);
-        pl2.setTranslateY(-4000);
-        pl2.setTranslateZ(-100);
+        pl2.setTranslateX(.4 * WORLD_SIZE_X);
+        pl2.setTranslateY(-4 * WORLD_SIZE_Y);
+        pl2.setTranslateZ(-.1 * WORLD_SIZE_Z);
 
         camera = new PerspectiveCamera(true);
         camera.setNearClip(1);
-        camera.setFarClip(5000);
+        camera.setFarClip(5 * WORLD_SIZE_Z);
         camera.setRotationAxis(Rotate.Y_AXIS);
         camera.setRotate(0);
 
@@ -416,13 +416,13 @@ public class Main extends Application {
         return velocities.get(i);
     }
 
-    static final int COUNT = 800;
+    static final int COUNT = 1200;
 
-    static final int WORLD_SIZE_X = 1024;
+    static final int WORLD_SIZE_X = 2048;
 
-    static final int WORLD_SIZE_Y = 768;
+    static final int WORLD_SIZE_Y = 1536;
 
-    static final int WORLD_SIZE_Z = 1024;
+    static final int WORLD_SIZE_Z = WORLD_SIZE_X;
 
     static final int X_BOUND = WORLD_SIZE_X / 2;
 
@@ -432,11 +432,11 @@ public class Main extends Application {
 
     static final double GRAV_CONSTANT = .02;
 
-    static final double COLLISION_RETAIN = .4;
+    static final double COLLISION_RETAIN = .75;
 
-    static final double WALL_RETAIN = .8;
+    static final double WALL_RETAIN = .5;
 
-    static final double AIR_RETAIN = .9;
+    static final double AIR_RETAIN = .85;
 
     static final int CAMERA_STEPS = 21600;
 
