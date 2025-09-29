@@ -16,10 +16,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
-import java.util.function.UnaryOperator;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -40,6 +38,8 @@ public class Main extends Application {
     private final List<Re> res;
 
     private final List<Temperature> temperatures;
+
+    private final List<PhongMaterial> materials;
 
     private final List<Vector> positions;
 
@@ -72,7 +72,7 @@ public class Main extends Application {
                 )
         );
 
-        positions = objects(COUNT, _ -> new Vector(new Range(-350, 350)));
+        positions = objects(COUNT, _ -> new Vector(new Range(-randomRange(), randomRange())));
 
         accelerations = zeroes(COUNT);
 
@@ -81,11 +81,19 @@ public class Main extends Application {
         temperatures = objects(COUNT, _ -> new Temperature(ROOM_TEMP));
 
         collisionImpulses = objects(COUNT, _ -> Vector.ZERO);
+
+        materials = objects(
+            COUNT, i -> {
+                PhongMaterial phong = new PhongMaterial();
+                phong.diffuseColorProperty().set(res.get(i).rgb(0));
+                return phong;
+            }
+        );
+
         spheres = objects(
             COUNT, i -> {
-                Sphere sphere = new Sphere(res(i).radius());
-                Material redMaterial = new PhongMaterial(toRGB(res(i).color()));
-                sphere.setMaterial(redMaterial);
+                Sphere sphere = new Sphere(res.get(i).radius());
+                sphere.setMaterial(materials.get(i));
                 return sphere;
             }
         );
@@ -167,7 +175,7 @@ public class Main extends Application {
                 if (es > lastSec) {
                     double micros = .001d * total.toNanosPart() / frames;
                     long seconds = Duration.between(start, after).toSeconds();
-                    System.out.printf("%.1fµs fps: %.1f (%d / %s =>)%n", micros, 1d * frames /seconds, frames, total);
+                    System.out.printf("%.1fµs fps: %.1f (%d / %s =>)%n", micros, 1d * frames / seconds, frames, total);
                     lastSec = es;
                 }
             }
@@ -176,7 +184,7 @@ public class Main extends Application {
 
     private void update() {
         for (int i = 0; i < COUNT; i++) {
-            updateAcceleration(i);
+            accelerations.set(i, updatePulls(i));
         }
         for (int i = 0; i < COUNT; i++) {
             for (int j = i + 1; j < COUNT; j++) {
@@ -184,15 +192,15 @@ public class Main extends Application {
             }
         }
         for (int i = 0; i < COUNT; i++) {
-            updateVelocity(i);
+            velocities.set(i, updateVelocity(i, velocities.get(i)));
         }
 
         for (int i = 0; i < COUNT; i++) {
-            updateCollisionImpulse(i);
+            velocities.set(i, updateCollisionImpulse(i, velocities.get(i)));
         }
 
         for (int i = 0; i < COUNT; i++) {
-            updatePosition(i);
+            positions.set(i, positions.get(i).plus(velocities.get(i)));
         }
 
         for (int i = 0; i < COUNT; i++) {
@@ -203,43 +211,21 @@ public class Main extends Application {
             moveSphere(i);
         }
 
+        for (int i = 0; i < COUNT; i++) {
+            setOpacity(i);
+        }
+
         moveCamera();
     }
 
-    private void updatePosition(int i) {
-        setPos(
-            i,
-            (index, v) ->
-                v.plus(vel(index))
-        );
-    }
-
-    private void updateAcceleration(int i) {
-        setAcc(
-            i,
-            (index, _) ->
-                updatePulls(index)
-        );
-    }
-
-    private void updateVelocity(int i) {
-        setVel(
-            i,
-            (index, v) ->
-                updateVelocity(index, v)
-        );
+    private void setOpacity(int i) {
+        double distToOrigo = positions.get(i).length();
+        double opa = 1 - distToOrigo / WORLD_SIZE_Z;
+        materials.get(i).setDiffuseColor(res.get(i).rgb(opa));
     }
 
     private Vector updateVelocity(Integer index, Vector v) {
         return v.plus(accelerations.get(index)).mul(AIR_RETAIN);
-    }
-
-    private void updateCollisionImpulse(int i) {
-        setVel(
-            i,
-            (index, v) ->
-                updateCollisionImpulse(index, v)
-        );
     }
 
     private Vector updateCollisionImpulse(Integer index, Vector v) {
@@ -249,19 +235,19 @@ public class Main extends Application {
 
     private void moveSphere(int i) {
         Sphere s = spheres.get(i);
-        Vector p = pos(i);
+        Vector p = positions.get(i);
         s.setTranslateX(p.x());
         s.setTranslateY(p.y());
         s.setTranslateZ(p.z());
     }
 
     private void handleWallBounce(int i) {
-        double r = res(i).radius();
+        double r = res.get(i).radius();
 
-        Vector vel = vel(i);
+        Vector vel = velocities.get(i);
         double vx = vel.x(), vy = vel.y(), vz = vel.z();
 
-        Vector pos = pos(i);
+        Vector pos = positions.get(i);
         double px = pos.x(), py = pos.y(), pz = pos.z();
 
         boolean h = false;
@@ -323,8 +309,8 @@ public class Main extends Application {
     }
 
     private Vector updatePulls(int i) {
-        Vector pos = pos(i);
-        Re re = res(i);
+        Vector pos = positions.get(i);
+        Re re = res.get(i);
         Stream<Vector> otherSpherePulls = positions.stream()
             .filter(p -> p != pos)
             .map(other ->
@@ -345,106 +331,66 @@ public class Main extends Application {
     }
 
     private void handleCollision(int i, int j) {
-        Vector delta = pos(j).minus(pos(i));
-        double iR = res(i).radius();
-        double jR = res(j).radius();
+        Vector delta = positions.get(j).minus(positions.get(i));
+        double iR = res.get(i).radius();
+        double jR = res.get(j).radius();
         double dist = delta.zero() ? Math.min(iR, jR) / 100.0d : delta.length();
         if (dist <= iR + jR) {
             Vector n = delta.div(dist);
             double overlap = iR + jR - dist;
 
-            double iMass = res(i).mass();
-            double jMass = res(j).mass();
+            double iMass = res.get(i).mass();
+            double jMass = res.get(j).mass();
 
             double totalMass = iMass + jMass;
             double iMove = overlap * iMass / totalMass;
             double jMove = overlap * jMass / totalMass;
 
-            setPos(i, v -> v.minus(n.mul(iMove)));
-            setPos(j, v -> v.plus(n.mul(jMove)));
+            positions.set(i, positions.get(i).minus(n.mul(iMove)));
+            positions.set(j, positions.get(j).plus(n.mul(jMove)));
 
-            double vRelN = vel(i).minus(vel(j)).dot(n);
+            double vRelN = velocities.get(i).minus(velocities.get(j)).dot(n);
             double rawImpulse = -(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass);
             double impulse = COLLISION_RETAIN * rawImpulse;
 
-            setImp(i, (_, v) -> v.plus(n.mul(impulse / jMass)));
-            setImp(j, (_, v) -> v.minus(n.mul(impulse / iMass)));
+            collisionImpulses.set(i, collisionImpulses.get(i).plus(n.mul(impulse / jMass)));
+            collisionImpulses.set(j, collisionImpulses.get(j).minus(n.mul(impulse / iMass)));
         }
     }
 
-    private void setVel(int i, Vector v) {
-        velocities.set(i, v);
-    }
+    static final int COUNT = 640;
 
-    private void setVel(int i, UnaryOperator<Vector> op) {
-        set(velocities, i, op);
-    }
+    static final Range R_RANGE = new Range(10, 45);
 
-    private void setVel(int i, BiFunction<Integer, Vector, Vector> op) {
-        set(velocities, i, v -> op.apply(i, v));
-    }
+    static final int WORLD_SIZE_X = 1400;
 
-    private void setPos(int i, UnaryOperator<Vector> op) {
-        set(positions, i, op);
-    }
-
-    private void setPos(int i, BiFunction<Integer, Vector, Vector> op) {
-        set(positions, i, v -> op.apply(i, v));
-    }
-
-    private void setImp(int i, BiFunction<Integer, Vector, Vector> op) {
-        set(collisionImpulses, i, v -> op.apply(i, v));
-    }
-
-    private void setAcc(int i, UnaryOperator<Vector> op) {
-        set(accelerations, i, op);
-    }
-
-    private void setAcc(int i, BiFunction<Integer, Vector, Vector> op) {
-        set(accelerations, i, v -> op.apply(i, v));
-    }
-
-    private Re res(int i) {
-        return res.get(i);
-    }
-
-    private Vector pos(int j) {
-        return positions.get(j);
-    }
-
-    private Vector vel(int i) {
-        return velocities.get(i);
-    }
-
-    static final int COUNT = 1200;
-
-    static final int WORLD_SIZE_X = 2048;
-
-    static final int WORLD_SIZE_Y = 1536;
+    static final int WORLD_SIZE_Y = 1000;
 
     static final int WORLD_SIZE_Z = WORLD_SIZE_X;
+
+    static final int Z_BOUND = WORLD_SIZE_Z / 2;
 
     static final int X_BOUND = WORLD_SIZE_X / 2;
 
     static final int Y_BOUND = WORLD_SIZE_Y / 2;
 
-    static final int Z_BOUND = WORLD_SIZE_Z / 2;
-
     static final double GRAV_CONSTANT = .02;
 
-    static final double COLLISION_RETAIN = .75;
+    static final double COLLISION_RETAIN = .8;
 
-    static final double WALL_RETAIN = .5;
+    static final double WALL_RETAIN = .9;
 
-    static final double AIR_RETAIN = .85;
+    static final double AIR_RETAIN = .9;
 
     static final int CAMERA_STEPS = 21600;
 
     static final double COLOUR_RANGE = 0.85;
 
-    static final Range R_RANGE = new Range(10, 50);
-
     static final double ROOM_TEMP = 0.25;
+
+    private static double randomRange() {
+        return WORLD_SIZE_Z * 0.48;
+    }
 
     private static Re.Color color(int i, int count) {
         double ratio = 1d * i / count;
@@ -457,7 +403,7 @@ public class Main extends Application {
             adjust(r),
             adjust(g),
             adjust(b),
-            1.0d
+            .99d
         );
     }
 
@@ -465,10 +411,6 @@ public class Main extends Application {
         double raw = Math.max(0, r);
         double inRange = raw * COLOUR_RANGE;
         return 1.0 - COLOUR_RANGE + inRange;
-    }
-
-    private static Color toRGB(Re.Color color) {
-        return new Color(color.r(), color.g(), color.b(), color.opa());
     }
 
     private static List<Node> wires(double halfX, double halfY, double halfZ) {
@@ -540,10 +482,6 @@ public class Main extends Application {
 
     private static <T> List<T> objects(int count, IntFunction<T> intFunction) {
         return new ArrayList<>(stream(intFunction, count).toList());
-    }
-
-    private static <T> void set(List<T> list, int i, UnaryOperator<T> transform) {
-        list.set(i, transform.apply(list.get(i)));
     }
 
     private static double pullFrom(Vector sPos, Vector pos, Re re) {
