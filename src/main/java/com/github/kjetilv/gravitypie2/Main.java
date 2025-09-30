@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 
 import static javafx.scene.paint.Color.*;
 
+@SuppressWarnings("SameParameterValue")
 public class Main extends Application {
 
     static void main(String[] args) {
@@ -105,13 +106,13 @@ public class Main extends Application {
         AmbientLight ambient = new AmbientLight(Color.color(.3, .3, 0.5));
 
         PointLight pl1 = new PointLight(WHITE);
-        pl1.setTranslateX(-(.4 * WORLD_SIZE_X));
-        pl1.setTranslateY(.4 * WORLD_SIZE_Y);
+        pl1.setTranslateX(-(.3 * WORLD_SIZE_X));
+        pl1.setTranslateY(.3 * WORLD_SIZE_Y);
         pl1.setTranslateZ(.1 * WORLD_SIZE_X);
 
         PointLight pl2 = new PointLight(WHITE);
-        pl2.setTranslateX(.4 * WORLD_SIZE_X);
-        pl2.setTranslateY(-4 * WORLD_SIZE_Y);
+        pl2.setTranslateX(.3 * WORLD_SIZE_X);
+        pl2.setTranslateY(-3 * WORLD_SIZE_Y);
         pl2.setTranslateZ(-.1 * WORLD_SIZE_Z);
 
         camera = new PerspectiveCamera(true);
@@ -198,16 +199,7 @@ public class Main extends Application {
             accelerations[i] = updatePulls(i);
         }
         for (int i = 0; i < COUNT; i++) {
-            for (int j = i + 1; j < COUNT; j++) {
-                handleCollision(i, j);
-            }
-        }
-        for (int i = 0; i < COUNT; i++) {
             velocities[i] = updateVelocity(i, velocities[i]);
-        }
-
-        for (int i = 0; i < COUNT; i++) {
-            velocities[i] = updateCollisionImpulse(i, velocities[i]);
         }
 
         for (int i = 0; i < COUNT; i++) {
@@ -224,6 +216,16 @@ public class Main extends Application {
 
         for (int i = 0; i < COUNT; i++) {
             setOpacity(i);
+        }
+
+        for (int i = 0; i < COUNT; i++) {
+            for (int j = i + 1; j < COUNT; j++) {
+                handleCollision(i, j);
+            }
+        }
+
+        for (int i = 0; i < COUNT; i++) {
+            velocities[i] = updateCollisionImpulse(i, velocities[i]);
         }
 
         moveCamera();
@@ -246,8 +248,8 @@ public class Main extends Application {
     }
 
     private void moveSphere(int i) {
-        Sphere s = spheres[i];
         Vector p = positions[i];
+        Sphere s = spheres[i];
         s.setTranslateX(p.x());
         s.setTranslateY(p.y());
         s.setTranslateZ(p.z());
@@ -295,27 +297,23 @@ public class Main extends Application {
         }
 
         if (h) {
-            velocities[i] = new Vector(vx, vy, vz).mul(WALL_RETAIN);
+            velocities[i] = new Vector(vx * WALL_RETAIN, vy * WALL_RETAIN, vz * WALL_RETAIN);
             positions[i] = new Vector(px, py, pz);
         }
     }
 
     private void moveCamera() {
         double angle = 2 * Math.PI * cameraStep / CAMERA_STEPS;
-        Vector position = new Vector(
-            Math.sin(angle) * cameraLine.length(),
-            0,
-            Math.cos(angle) * cameraLine.length()
-        );
+        double x = Math.sin(angle) * cameraLine.length();
+        double z = Math.cos(angle) * cameraLine.length();
 
         // Move the camera along the circle around origin
-        camera.setTranslateX(position.x());
-        camera.setTranslateY(position.y());
-        camera.setTranslateZ(position.z());
+        camera.setTranslateX(x);
+        camera.setTranslateY(0);
+        camera.setTranslateZ(z);
 
         // Compute yaw (rotation around Y axis) and pitch (rotation around X axis)
-        double yaw = Math.toDegrees(Math.atan2(-position.x(), -position.z()));
-        camera.setRotate(yaw);
+        camera.setRotate(Math.toDegrees(Math.atan2(-x, -z)));
 
         cameraStep = (cameraStep - 1) % CAMERA_STEPS;
     }
@@ -362,9 +360,9 @@ public class Main extends Application {
         }
     }
 
-    static final int COUNT = 1040;
+    static final int COUNT = 1000;
 
-    static final Range R_RANGE = new Range(5, 40);
+    static final Range R_RANGE = new Range(20, 50);
 
     static final int WORLD_SIZE_X = 1440;
 
@@ -382,9 +380,9 @@ public class Main extends Application {
 
     static final double COLLISION_RETAIN = .75;
 
-    static final double WALL_RETAIN = .9;
+    static final double WALL_RETAIN = .5;
 
-    static final double AIR_RETAIN = .9;
+    static final double AIR_RETAIN = .75;
 
     static final int CAMERA_STEPS = 21600;
 

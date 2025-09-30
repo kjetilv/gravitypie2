@@ -44,7 +44,7 @@ record Vector(double x, double y, double z) {
     }
 
     double dot(Vector v) {
-        return x * v.x() + y * v.y() + z * v.z();
+        return x * v.x + y * v.y + z * v.z;
     }
 
     Vector flip() {
@@ -72,11 +72,11 @@ record Vector(double x, double y, double z) {
     }
 
     Vector plus(Vector v) {
-        return new Vector(x + v.x(), y + v.y(), z + v.z());
+        return new Vector(x + v.x, y + v.y, z + v.z);
     }
 
     Vector minus(Vector v) {
-        return new Vector(x - v.x(), y - v.y(), z - v.z());
+        return new Vector(x - v.x, y - v.y, z - v.z);
     }
 
     /**
@@ -87,9 +87,9 @@ record Vector(double x, double y, double z) {
      */
     double distanceTo(Vector v) {
         return v.equals(this) ? 0d : sqrt(
-            pow(x - v.x(), 2) +
-            pow(y - v.y(), 2) +
-            pow(z - v.z(), 2)
+            pow(x - v.x, 2) +
+            pow(y - v.y, 2) +
+            pow(z - v.z, 2)
         );
     }
 
@@ -101,7 +101,7 @@ record Vector(double x, double y, double z) {
      */
     double angleBetween(Vector v) {
         // Calculate dot product
-        double dotProduct = x * v.x() + y * v.y() + z * v.z();
+        double dotProduct = x * v.x + y * v.y + z * v.z;
 
         // Calculate magnitudes
         double length = length();
