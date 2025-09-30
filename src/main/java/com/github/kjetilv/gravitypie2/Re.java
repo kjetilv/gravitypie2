@@ -1,7 +1,5 @@
 package com.github.kjetilv.gravitypie2;
 
-import javafx.scene.paint.Color;
-
 record Re(
     double weight,
     double radius,

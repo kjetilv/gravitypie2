@@ -3,7 +3,10 @@ package com.github.kjetilv.gravitypie2;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.*;
+import javafx.scene.control.Label;
+import javafx.scene.control.Slider;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Material;
 import javafx.scene.paint.PhongMaterial;
@@ -58,6 +61,8 @@ public class Main extends Application {
     private final String title;
 
     private final PerspectiveCamera camera;
+
+    private double gravConstant = .01;
 
     public Main() {
         this.title = "Stars";
@@ -144,7 +149,32 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
-        StackPane root = new StackPane(subScene);
+        // Create the gravitational constant slider
+        Slider slider = new Slider(0.001, 1, gravConstant);
+        slider.setShowTickLabels(true);
+        slider.setShowTickMarks(true);
+        slider.setMajorTickUnit(0.1);
+        slider.setMinorTickCount(5);
+        slider.setBlockIncrement(0.01);
+        slider.setPrefWidth(200);
+
+        Label label = new Label(String.format("Gravity: %.4f", gravConstant));
+        label.setTextFill(LIGHTSEAGREEN);
+
+        // Update the constant when slider changes
+        slider.valueProperty().addListener((_, _, val) -> {
+            gravConstant = val.doubleValue();
+            label.setText(String.format("Gravity: %.4f", gravConstant));
+        });
+
+        // Create a container for the slider with label
+        VBox sliderBox = new VBox(2, label, slider);
+        sliderBox.setPadding(new javafx.geometry.Insets(2));
+        sliderBox.setStyle("-fx-background-color: rgba(0, 0, 0, 0); -fx-background-radius: 5;");
+
+        StackPane root = new StackPane(subScene, sliderBox);
+        StackPane.setAlignment(sliderBox, javafx.geometry.Pos.BOTTOM_LEFT);
+
         Scene scene = new Scene(root, WORLD_SIZE_X, WORLD_SIZE_Y, true);
         stage.setTitle(title);
         stage.setScene(scene);
@@ -238,7 +268,7 @@ public class Main extends Application {
     }
 
     private Vector updateVelocity(Integer index, Vector v) {
-        return v.plus(accelerations[index]).mul(AIR_RETAIN);
+        return v.plus(accelerations[index]).mul(1 - AIR_BRAKE);
     }
 
     private Vector updateCollisionImpulse(Integer index, Vector v) {
@@ -297,7 +327,8 @@ public class Main extends Application {
         }
 
         if (h) {
-            velocities[i] = new Vector(vx * WALL_RETAIN, vy * WALL_RETAIN, vz * WALL_RETAIN);
+            double wallBrake = 1 - WALL_BRAKE;
+            velocities[i] = new Vector(vx * wallBrake, vy * wallBrake, vz * wallBrake);
             positions[i] = new Vector(px, py, pz);
         }
     }
@@ -353,11 +384,16 @@ public class Main extends Application {
 
             double vRelN = velocities[i].minus(velocities[j]).dot(n);
             double rawImpulse = -(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass);
-            double impulse = COLLISION_RETAIN * rawImpulse;
+            double impulse = (1 - COLLISION_BRAKE) * rawImpulse;
 
             collisionImpulses[i] = collisionImpulses[i].plus(n.mul(impulse / jMass));
             collisionImpulses[j] = collisionImpulses[j].minus(n.mul(impulse / iMass));
         }
+    }
+
+    private double pullFrom(Vector sPos, Vector pos, Re re) {
+        double distance = pos.distanceTo(sPos);
+        return gravConstant * re.weight() / (distance * distance);
     }
 
     static final int COUNT = 1000;
@@ -376,13 +412,11 @@ public class Main extends Application {
 
     static final int Y_BOUND = WORLD_SIZE_Y / 2;
 
-    static final double GRAV_CONSTANT = .01;
+    static final double COLLISION_BRAKE = .25;
 
-    static final double COLLISION_RETAIN = .75;
+    static final double WALL_BRAKE = .5;
 
-    static final double WALL_RETAIN = .5;
-
-    static final double AIR_RETAIN = .75;
+    static final double AIR_BRAKE = .25;
 
     static final int CAMERA_STEPS = 21600;
 
@@ -492,10 +526,5 @@ public class Main extends Application {
                 Array.set(array, i, intFunction.apply(i))
             );
         return (T[]) array;
-    }
-
-    private static double pullFrom(Vector sPos, Vector pos, Re re) {
-        double distance = pos.distanceTo(sPos);
-        return GRAV_CONSTANT * re.weight() / (distance * distance);
     }
 }
