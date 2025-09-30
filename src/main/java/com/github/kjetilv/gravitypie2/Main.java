@@ -15,6 +15,7 @@ import javafx.stage.Stage;
 import java.lang.reflect.Array;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -31,7 +32,7 @@ public class Main extends Application {
         launch(args);
     }
 
-    private final Vector cameraLine = new Vector(0, 0, -2.16 * WORLD_SIZE_Z);
+    private final Vector cameraLine = new Vector(0, 0, -2 * WORLD_SIZE_Z);
 
     private int cameraStep;
 
@@ -50,10 +51,6 @@ public class Main extends Application {
     private final Vector[] velocities;
 
     private final Vector[] collisionImpulses;
-
-    private final List<Vector> blackHolePositions;
-
-    private final List<Re> blackHoles;
 
     private final SubScene subScene;
 
@@ -82,7 +79,7 @@ public class Main extends Application {
 
         temperatures = objects(COUNT, _ -> new Temperature(ROOM_TEMP), Temperature.class);
 
-        collisionImpulses = objects(COUNT, _ -> Vector.ZERO, Vector.class);
+        collisionImpulses = objects(COUNT, _ -> ZERO, Vector.class);
 
         materials = objects(
             COUNT, i -> {
@@ -105,9 +102,6 @@ public class Main extends Application {
         Material blueMaterial = new PhongMaterial(GHOSTWHITE);
         origo.setMaterial(blueMaterial);
 
-        blackHolePositions = List.of(/*new Vector(0, 0, 0)*/);
-        blackHoles = List.of(new Re(100, 25, 25, new Re.Color(0d, 0d, 0d, 1.0d)));
-
         AmbientLight ambient = new AmbientLight(Color.color(.3, .3, 0.5));
 
         PointLight pl1 = new PointLight(WHITE);
@@ -129,11 +123,10 @@ public class Main extends Application {
         List<Node> wire = wires(X_BOUND, Y_BOUND, Z_BOUND);
 
         Stream<Node> nodeStream = Stream.of(
-                Stream.of(ambient, pl1, pl2, origo),
-                Arrays.stream(spheres),
-                wire.stream()
-            )
-            .flatMap(Function.identity());
+            Stream.of(ambient, pl1, pl2, origo),
+            Arrays.stream(spheres),
+            wire.stream()
+        ).flatMap(Function.identity());
         List<Node> nodes = nodeStream.toList();
 
         Group world = new Group(nodes);
@@ -159,27 +152,42 @@ public class Main extends Application {
 
         new AnimationTimer() {
 
-            private final Instant start = Instant.now();
+            private final Instant start = Instant.now().truncatedTo(ChronoUnit.SECONDS).plusSeconds(5);
 
             private Duration total = Duration.ZERO;
 
             private long frames;
 
-            private long lastSec;
+            private long lastSec = start.getEpochSecond();
 
             @Override
             public void handle(long l) {
                 Instant before = Instant.now();
                 update();
                 Instant after = Instant.now();
-                total = total.plus(Duration.between(before, after));
-                frames++;
-                long es = after.getEpochSecond();
-                if (es > lastSec) {
-                    double micros = .001d * total.toNanosPart() / frames;
-                    long seconds = Duration.between(start, after).toSeconds();
-                    System.out.printf("%.1fµs fps: %.1f (%d / %s =>)%n", micros, 1d * frames / seconds, frames, total);
-                    lastSec = es;
+                if (after.isAfter(start)) {
+                    total = total.plus(Duration.between(before, after));
+                    frames++;
+                    long es = after.getEpochSecond();
+                    if (es > lastSec) {
+                        try {
+                            double msTotal = total.getSeconds() * 1_000d + total.getNano() / 1_000_000d;
+                            double microsPerFrame = msTotal / frames;
+                            long seconds = Duration.between(start, after).toSeconds();
+                            double fps = 1d * frames / seconds;
+                            double bugdet = 1000d / fps;
+                            System.out.printf(
+                                "%.1fms/frame %.1ffps [%.1fms]%n",
+                                microsPerFrame,
+                                fps,
+                                bugdet
+                            );
+                        } finally {
+                            lastSec = es;
+                        }
+                    }
+                } else {
+                    update();
                 }
             }
         }.start();
@@ -233,7 +241,7 @@ public class Main extends Application {
 
     private Vector updateCollisionImpulse(Integer index, Vector v) {
         Vector collisionImpulse = collisionImpulses[index];
-        collisionImpulses[index] = Vector.ZERO;
+        collisionImpulses[index] = ZERO;
         return v.plus(collisionImpulse);
     }
 
@@ -315,23 +323,14 @@ public class Main extends Application {
     private Vector updatePulls(int i) {
         Vector pos = positions[i];
         Re re = res[i];
-        Stream<Vector> otherSpherePulls = Arrays.stream(positions)
-            .filter(p -> p != pos)
-            .map(other ->
-                other.minus(pos).mul(pullFrom(other, pos, re)));
-        Stream<Vector> blackHolePulls = IntStream.range(0, blackHolePositions.size())
-            .mapToObj(index ->
-                blackHolePositions.get(index)
-                    .minus(pos)
-                    .mul(
-                        pullFrom(blackHolePositions.get(index), pos, blackHoles.get(index))
-                    ));
-        return Stream.concat(otherSpherePulls, blackHolePulls)
-            .reduce(
-                new Vector(),
-                Vector::plus,
-                Vector::plus
-            );
+        Vector pull = ZERO;
+        for (int j = 0; j < COUNT; j++) {
+            if (i != j) {
+                double force = pullFrom(positions[j], pos, re);
+                pull = pull.plus(positions[j].minus(pos).mul(force));
+            }
+        }
+        return pull;
     }
 
     private void handleCollision(int i, int j) {
@@ -363,13 +362,13 @@ public class Main extends Application {
         }
     }
 
-    static final int COUNT = 640;
+    static final int COUNT = 1040;
 
-    static final Range R_RANGE = new Range(10, 45);
+    static final Range R_RANGE = new Range(5, 40);
 
-    static final int WORLD_SIZE_X = 1400;
+    static final int WORLD_SIZE_X = 1440;
 
-    static final int WORLD_SIZE_Y = 1000;
+    static final int WORLD_SIZE_Y = 900;
 
     static final int WORLD_SIZE_Z = WORLD_SIZE_X;
 
@@ -379,9 +378,9 @@ public class Main extends Application {
 
     static final int Y_BOUND = WORLD_SIZE_Y / 2;
 
-    static final double GRAV_CONSTANT = .02;
+    static final double GRAV_CONSTANT = .01;
 
-    static final double COLLISION_RETAIN = .8;
+    static final double COLLISION_RETAIN = .75;
 
     static final double WALL_RETAIN = .9;
 
@@ -392,6 +391,8 @@ public class Main extends Application {
     static final double COLOUR_RANGE = 0.85;
 
     static final double ROOM_TEMP = 0.25;
+
+    static Vector ZERO = new Vector();
 
     private static double randomRange() {
         return WORLD_SIZE_Z * 0.48;
@@ -498,9 +499,5 @@ public class Main extends Application {
     private static double pullFrom(Vector sPos, Vector pos, Re re) {
         double distance = pos.distanceTo(sPos);
         return GRAV_CONSTANT * re.weight() / (distance * distance);
-    }
-
-    private static <T> Stream<T> stream(IntFunction<T> f, int count) {
-        return IntStream.range(0, count).mapToObj(f);
     }
 }
