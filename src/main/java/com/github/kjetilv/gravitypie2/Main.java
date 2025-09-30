@@ -12,9 +12,11 @@ import javafx.scene.shape.Sphere;
 import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 
+import java.lang.reflect.Array;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -33,21 +35,21 @@ public class Main extends Application {
 
     private int cameraStep;
 
-    private final List<Sphere> spheres;
+    private final Sphere[] spheres;
 
-    private final List<Re> res;
+    private final Re[] res;
 
-    private final List<Temperature> temperatures;
+    private final Temperature[] temperatures;
 
-    private final List<PhongMaterial> materials;
+    private final PhongMaterial[] materials;
 
-    private final List<Vector> positions;
+    private final Vector[] positions;
 
-    private final List<Vector> accelerations;
+    private final Vector[] accelerations;
 
-    private final List<Vector> velocities;
+    private final Vector[] velocities;
 
-    private final List<Vector> collisionImpulses;
+    private final Vector[] collisionImpulses;
 
     private final List<Vector> blackHolePositions;
 
@@ -69,33 +71,34 @@ public class Main extends Application {
                     R_RANGE.point(i, COUNT),
                     1L,
                     color(i, COUNT)
-                )
+                ), Re.class
         );
 
-        positions = objects(COUNT, _ -> new Vector(new Range(-randomRange(), randomRange())));
+        positions = objects(COUNT, _ -> new Vector(new Range(-randomRange(), randomRange())), Vector.class);
 
         accelerations = zeroes(COUNT);
 
         velocities = zeroes(COUNT);
 
-        temperatures = objects(COUNT, _ -> new Temperature(ROOM_TEMP));
+        temperatures = objects(COUNT, _ -> new Temperature(ROOM_TEMP), Temperature.class);
 
-        collisionImpulses = objects(COUNT, _ -> Vector.ZERO);
+        collisionImpulses = objects(COUNT, _ -> Vector.ZERO, Vector.class);
 
         materials = objects(
             COUNT, i -> {
                 PhongMaterial phong = new PhongMaterial();
-                phong.diffuseColorProperty().set(res.get(i).rgb(0));
+                phong.diffuseColorProperty().set(res[i].rgb(0));
                 return phong;
-            }
+            }, PhongMaterial.class
         );
 
         spheres = objects(
-            COUNT, i -> {
-                Sphere sphere = new Sphere(res.get(i).radius());
-                sphere.setMaterial(materials.get(i));
+            COUNT,
+            i -> {
+                Sphere sphere = new Sphere(res[i].radius());
+                sphere.setMaterial(materials[i]);
                 return sphere;
-            }
+            }, Sphere.class
         );
 
         Sphere origo = new Sphere(4);
@@ -127,7 +130,7 @@ public class Main extends Application {
 
         Stream<Node> nodeStream = Stream.of(
                 Stream.of(ambient, pl1, pl2, origo),
-                spheres.stream(),
+                Arrays.stream(spheres),
                 wire.stream()
             )
             .flatMap(Function.identity());
@@ -184,7 +187,7 @@ public class Main extends Application {
 
     private void update() {
         for (int i = 0; i < COUNT; i++) {
-            accelerations.set(i, updatePulls(i));
+            accelerations[i] = updatePulls(i);
         }
         for (int i = 0; i < COUNT; i++) {
             for (int j = i + 1; j < COUNT; j++) {
@@ -192,15 +195,15 @@ public class Main extends Application {
             }
         }
         for (int i = 0; i < COUNT; i++) {
-            velocities.set(i, updateVelocity(i, velocities.get(i)));
+            velocities[i] = updateVelocity(i, velocities[i]);
         }
 
         for (int i = 0; i < COUNT; i++) {
-            velocities.set(i, updateCollisionImpulse(i, velocities.get(i)));
+            velocities[i] = updateCollisionImpulse(i, velocities[i]);
         }
 
         for (int i = 0; i < COUNT; i++) {
-            positions.set(i, positions.get(i).plus(velocities.get(i)));
+            positions[i] = positions[i].plus(velocities[i]);
         }
 
         for (int i = 0; i < COUNT; i++) {
@@ -219,35 +222,36 @@ public class Main extends Application {
     }
 
     private void setOpacity(int i) {
-        double distToOrigo = positions.get(i).length();
+        double distToOrigo = positions[i].length();
         double opa = 1 - distToOrigo / WORLD_SIZE_Z;
-        materials.get(i).setDiffuseColor(res.get(i).rgb(opa));
+        materials[i].setDiffuseColor(res[i].rgb(opa));
     }
 
     private Vector updateVelocity(Integer index, Vector v) {
-        return v.plus(accelerations.get(index)).mul(AIR_RETAIN);
+        return v.plus(accelerations[index]).mul(AIR_RETAIN);
     }
 
     private Vector updateCollisionImpulse(Integer index, Vector v) {
-        Vector impulse = collisionImpulses.set(index, Vector.ZERO);
-        return v.plus(impulse);
+        Vector collisionImpulse = collisionImpulses[index];
+        collisionImpulses[index] = Vector.ZERO;
+        return v.plus(collisionImpulse);
     }
 
     private void moveSphere(int i) {
-        Sphere s = spheres.get(i);
-        Vector p = positions.get(i);
+        Sphere s = spheres[i];
+        Vector p = positions[i];
         s.setTranslateX(p.x());
         s.setTranslateY(p.y());
         s.setTranslateZ(p.z());
     }
 
     private void handleWallBounce(int i) {
-        double r = res.get(i).radius();
+        double r = res[i].radius();
 
-        Vector vel = velocities.get(i);
+        Vector vel = velocities[i];
         double vx = vel.x(), vy = vel.y(), vz = vel.z();
 
-        Vector pos = positions.get(i);
+        Vector pos = positions[i];
         double px = pos.x(), py = pos.y(), pz = pos.z();
 
         boolean h = false;
@@ -283,8 +287,8 @@ public class Main extends Application {
         }
 
         if (h) {
-            velocities.set(i, new Vector(vx, vy, vz).mul(WALL_RETAIN));
-            positions.set(i, new Vector(px, py, pz));
+            velocities[i] = new Vector(vx, vy, vz).mul(WALL_RETAIN);
+            positions[i] = new Vector(px, py, pz);
         }
     }
 
@@ -309,9 +313,9 @@ public class Main extends Application {
     }
 
     private Vector updatePulls(int i) {
-        Vector pos = positions.get(i);
-        Re re = res.get(i);
-        Stream<Vector> otherSpherePulls = positions.stream()
+        Vector pos = positions[i];
+        Re re = res[i];
+        Stream<Vector> otherSpherePulls = Arrays.stream(positions)
             .filter(p -> p != pos)
             .map(other ->
                 other.minus(pos).mul(pullFrom(other, pos, re)));
@@ -331,30 +335,31 @@ public class Main extends Application {
     }
 
     private void handleCollision(int i, int j) {
-        Vector delta = positions.get(j).minus(positions.get(i));
-        double iR = res.get(i).radius();
-        double jR = res.get(j).radius();
+        assert i != j;
+        Vector delta = positions[j].minus(positions[i]);
+        double iR = res[i].radius();
+        double jR = res[j].radius();
         double dist = delta.zero() ? Math.min(iR, jR) / 100.0d : delta.length();
         if (dist <= iR + jR) {
             Vector n = delta.div(dist);
             double overlap = iR + jR - dist;
 
-            double iMass = res.get(i).mass();
-            double jMass = res.get(j).mass();
+            double iMass = res[i].mass();
+            double jMass = res[j].mass();
 
             double totalMass = iMass + jMass;
             double iMove = overlap * iMass / totalMass;
             double jMove = overlap * jMass / totalMass;
 
-            positions.set(i, positions.get(i).minus(n.mul(iMove)));
-            positions.set(j, positions.get(j).plus(n.mul(jMove)));
+            positions[i] = positions[i].minus(n.mul(iMove));
+            positions[j] = positions[j].plus(n.mul(jMove));
 
-            double vRelN = velocities.get(i).minus(velocities.get(j)).dot(n);
+            double vRelN = velocities[i].minus(velocities[j]).dot(n);
             double rawImpulse = -(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass);
             double impulse = COLLISION_RETAIN * rawImpulse;
 
-            collisionImpulses.set(i, collisionImpulses.get(i).plus(n.mul(impulse / jMass)));
-            collisionImpulses.set(j, collisionImpulses.get(j).minus(n.mul(impulse / iMass)));
+            collisionImpulses[i] = collisionImpulses[i].plus(n.mul(impulse / jMass));
+            collisionImpulses[j] = collisionImpulses[j].minus(n.mul(impulse / iMass));
         }
     }
 
@@ -476,12 +481,18 @@ public class Main extends Application {
         l.setEndY(y);
     }
 
-    private static List<Vector> zeroes(int count) {
-        return objects(count, _ -> new Vector());
+    private static Vector[] zeroes(int count) {
+        return objects(count, _ -> new Vector(), Vector.class);
     }
 
-    private static <T> List<T> objects(int count, IntFunction<T> intFunction) {
-        return new ArrayList<>(stream(intFunction, count).toList());
+    @SuppressWarnings("unchecked")
+    private static <T> T[] objects(int count, IntFunction<T> intFunction, Class<T> clazz) {
+        Object array = Array.newInstance(clazz, count);
+        IntStream.range(0, count)
+            .forEach(i ->
+                Array.set(array, i, intFunction.apply(i))
+            );
+        return (T[]) array;
     }
 
     private static double pullFrom(Vector sPos, Vector pos, Re re) {
