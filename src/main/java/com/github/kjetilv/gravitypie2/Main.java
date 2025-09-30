@@ -84,7 +84,7 @@ public class Main extends Application {
         materials = objects(
             COUNT, i -> {
                 PhongMaterial phong = new PhongMaterial();
-                phong.diffuseColorProperty().set(res[i].rgb(0));
+                phong.diffuseColorProperty().set(res[i].rgb(1, 1));
                 return phong;
             }, PhongMaterial.class
         );
@@ -231,8 +231,8 @@ public class Main extends Application {
 
     private void setOpacity(int i) {
         double distToOrigo = positions[i].length();
-        double opa = 1 - distToOrigo / WORLD_SIZE_Z;
-        materials[i].setDiffuseColor(res[i].rgb(opa));
+        double opa = 1 - distToOrigo / WORLD_SIZE_X;
+        materials[i].setDiffuseColor(res[i].rgb(opa, opa));
     }
 
     private Vector updateVelocity(Integer index, Vector v) {
