@@ -1,10 +1,10 @@
 package com.github.kjetilv.gravitypie2;
 
-import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.*;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -16,17 +16,17 @@ import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 
 import java.lang.reflect.Array;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static javafx.geometry.Pos.BOTTOM_CENTER;
+import static javafx.geometry.Pos.BOTTOM_LEFT;
 import static javafx.scene.paint.Color.*;
 
 @SuppressWarnings("SameParameterValue")
@@ -60,9 +60,48 @@ public class Main extends Application {
 
     private final String title;
 
-    private final PerspectiveCamera camera;
+    private final Slidouble airBrake = new Slidouble("Air brake", .25);
 
-    private double gravConstant = .01;
+    private final Slidouble gravConstant = new Slidouble("Gravity", .05);
+
+    private final Slidouble collisionBrake = new Slidouble("Collision brake", .25d);
+
+    private final Slidouble wallBrake = new Slidouble("Wall brake", .5d);
+
+    private final AtomicReference<Slidouble> slidableSlidouble = new AtomicReference<>();
+
+    private final List<Slidouble> slidableSlidoubles = List.of(
+        gravConstant,
+        airBrake,
+        collisionBrake,
+        wallBrake
+    );
+
+    private int currentSlidableSlidouble = 0;
+
+    private final Label label = new Label();
+
+    private final PerspectiveCamera camera = new PerspectiveCamera(true);
+
+    private final Slider slider = new Slider(0.000, 1, 0.1);
+
+    private final SlidoubleListener slidoubleListener = new SlidoubleListener(label, slider, slidableSlidouble);
+
+    {
+        label.setTextFill(BLACK);
+
+        camera.setNearClip(1);
+        camera.setFarClip(5 * WORLD_SIZE_Z);
+        camera.setRotationAxis(Rotate.Y_AXIS);
+        camera.setRotate(0);
+
+        slider.setShowTickLabels(true);
+        slider.setShowTickMarks(true);
+        slider.setMajorTickUnit(0.1);
+        slider.setMinorTickCount(5);
+        slider.setBlockIncrement(0.01);
+        slider.setPrefWidth(200);
+    }
 
     public Main() {
         this.title = "Stars";
@@ -111,20 +150,14 @@ public class Main extends Application {
         AmbientLight ambient = new AmbientLight(Color.color(.3, .3, 0.5));
 
         PointLight pl1 = new PointLight(WHITE);
-        pl1.setTranslateX(-(.3 * WORLD_SIZE_X));
-        pl1.setTranslateY(.3 * WORLD_SIZE_Y);
-        pl1.setTranslateZ(.1 * WORLD_SIZE_X);
+        pl1.setTranslateX(-(.4 * WORLD_SIZE_X));
+        pl1.setTranslateY(.4 * WORLD_SIZE_Y);
+        pl1.setTranslateZ(.5 * WORLD_SIZE_X);
 
         PointLight pl2 = new PointLight(WHITE);
-        pl2.setTranslateX(.3 * WORLD_SIZE_X);
-        pl2.setTranslateY(-3 * WORLD_SIZE_Y);
-        pl2.setTranslateZ(-.1 * WORLD_SIZE_Z);
-
-        camera = new PerspectiveCamera(true);
-        camera.setNearClip(1);
-        camera.setFarClip(5 * WORLD_SIZE_Z);
-        camera.setRotationAxis(Rotate.Y_AXIS);
-        camera.setRotate(0);
+        pl2.setTranslateX(.4 * WORLD_SIZE_X);
+        pl2.setTranslateY(-4 * WORLD_SIZE_Y);
+        pl2.setTranslateZ(-.5 * WORLD_SIZE_Z);
 
         List<Node> wire = wires(X_BOUND, Y_BOUND, Z_BOUND);
 
@@ -145,27 +178,18 @@ public class Main extends Application {
         );
         subScene.setFill(BLACK);
         subScene.setCamera(camera);
+
+        refreshSlider();
     }
 
     @Override
     public void start(Stage stage) {
         // Create the gravitational constant slider
-        Slider slider = new Slider(0.001, 1, gravConstant);
-        slider.setShowTickLabels(true);
-        slider.setShowTickMarks(true);
-        slider.setMajorTickUnit(0.1);
-        slider.setMinorTickCount(5);
-        slider.setBlockIncrement(0.01);
-        slider.setPrefWidth(200);
 
-        Label label = new Label(String.format("Gravity: %.4f", gravConstant));
-        label.setTextFill(LIGHTSEAGREEN);
+        slidableSlidouble.set(gravConstant);
 
         // Update the constant when slider changes
-        slider.valueProperty().addListener((_, _, val) -> {
-            gravConstant = val.doubleValue();
-            label.setText(String.format("Gravity: %.4f", gravConstant));
-        });
+        slider.valueProperty().addListener(slidoubleListener);
 
         // Create a container for the slider with label
         VBox sliderBox = new VBox(2, label, slider);
@@ -173,55 +197,33 @@ public class Main extends Application {
         sliderBox.setStyle("-fx-background-color: rgba(0, 0, 0, 0); -fx-background-radius: 5;");
 
         StackPane root = new StackPane(subScene, sliderBox);
-        StackPane.setAlignment(sliderBox, javafx.geometry.Pos.BOTTOM_LEFT);
+        StackPane.setAlignment(sliderBox, BOTTOM_LEFT);
+        StackPane.setAlignment(subScene, BOTTOM_CENTER);
 
-        Scene scene = new Scene(root, WORLD_SIZE_X, WORLD_SIZE_Y, true);
+        Scene scene = new Scene(root, WORLD_SIZE_X, WORLD_SIZE_Y + 60, true);
         stage.setTitle(title);
         stage.setScene(scene);
         stage.setResizable(true);
         stage.show();
 
-        new AnimationTimer() {
-
-            private final Instant start = Instant.now().truncatedTo(ChronoUnit.SECONDS).plusSeconds(5);
-
-            private Duration total = Duration.ZERO;
-
-            private long frames;
-
-            private long lastSec = start.getEpochSecond();
-
-            @Override
-            public void handle(long l) {
-                Instant before = Instant.now();
-                update();
-                Instant after = Instant.now();
-                if (after.isAfter(start)) {
-                    total = total.plus(Duration.between(before, after));
-                    frames++;
-                    long es = after.getEpochSecond();
-                    if (es > lastSec) {
-                        try {
-                            double msTotal = total.getSeconds() * 1_000d + total.getNano() / 1_000_000d;
-                            double microsPerFrame = msTotal / frames;
-                            long seconds = Duration.between(start, after).toSeconds();
-                            double fps = 1d * frames / seconds;
-                            double bugdet = 1000d / fps;
-                            System.out.printf(
-                                "%.1fms/frame %.1ffps [%.1fms]%n",
-                                microsPerFrame,
-                                fps,
-                                bugdet
-                            );
-                        } finally {
-                            lastSec = es;
-                        }
-                    }
-                } else {
-                    update();
+        scene.setOnKeyPressed(event -> {
+            Slidouble current = slidableSlidouble.get();
+            if (current != null) {
+                if (event.getCode() == KeyCode.UP) {
+                    currentSlidableSlidouble = (currentSlidableSlidouble + 1) % slidableSlidoubles.size();
+                } else if (event.getCode() == KeyCode.DOWN) {
+                    int newIndex = (currentSlidableSlidouble - 1) % slidableSlidoubles.size();
+                    currentSlidableSlidouble = newIndex < 0 ? slidableSlidoubles.size() - 1 : newIndex;
                 }
+                refreshSlider();
             }
-        }.start();
+        });
+
+        new SphereAnimationTimer(this::update).start();
+    }
+
+    private void refreshSlider() {
+        slidoubleListener.nowDo(slidableSlidoubles.get(currentSlidableSlidouble));
     }
 
     private void update() {
@@ -268,7 +270,7 @@ public class Main extends Application {
     }
 
     private Vector updateVelocity(Integer index, Vector v) {
-        return v.plus(accelerations[index]).mul(1 - AIR_BRAKE);
+        return v.plus(accelerations[index]).mul(airBrake.mirrorValue());
     }
 
     private Vector updateCollisionImpulse(Integer index, Vector v) {
@@ -327,8 +329,8 @@ public class Main extends Application {
         }
 
         if (h) {
-            double wallBrake = 1 - WALL_BRAKE;
-            velocities[i] = new Vector(vx * wallBrake, vy * wallBrake, vz * wallBrake);
+            double brake = this.wallBrake.mirrorValue();
+            velocities[i] = new Vector(vx * brake, vy * brake, vz * brake);
             positions[i] = new Vector(px, py, pz);
         }
     }
@@ -384,7 +386,7 @@ public class Main extends Application {
 
             double vRelN = velocities[i].minus(velocities[j]).dot(n);
             double rawImpulse = -(1 + Math.E) * vRelN / (1 / iMass + 1 / jMass);
-            double impulse = (1 - COLLISION_BRAKE) * rawImpulse;
+            double impulse = collisionBrake.mirrorTimes(rawImpulse);
 
             collisionImpulses[i] = collisionImpulses[i].plus(n.mul(impulse / jMass));
             collisionImpulses[j] = collisionImpulses[j].minus(n.mul(impulse / iMass));
@@ -393,10 +395,10 @@ public class Main extends Application {
 
     private double pullFrom(Vector sPos, Vector pos, Re re) {
         double distance = pos.distanceTo(sPos);
-        return gravConstant * re.weight() / (distance * distance);
+        return gravConstant.times(re.weight()) / (distance * distance);
     }
 
-    static final int COUNT = 1000;
+    static final int COUNT = 500;
 
     static final Range R_RANGE = new Range(20, 50);
 
@@ -411,12 +413,6 @@ public class Main extends Application {
     static final int X_BOUND = WORLD_SIZE_X / 2;
 
     static final int Y_BOUND = WORLD_SIZE_Y / 2;
-
-    static final double COLLISION_BRAKE = .25;
-
-    static final double WALL_BRAKE = .5;
-
-    static final double AIR_BRAKE = .25;
 
     static final int CAMERA_STEPS = 21600;
 
