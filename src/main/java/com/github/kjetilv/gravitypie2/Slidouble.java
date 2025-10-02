@@ -36,8 +36,8 @@ final class Slidouble {
         return (1 - value) * d;
     }
 
-    public void zero() {
-        value(0.25d);
+    public void max() {
+        value(1d);
     }
 
     String labelString() {

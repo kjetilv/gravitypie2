@@ -3,6 +3,10 @@ package com.github.kjetilv.gravitypie2;
 import module java.base;
 import module javafx.controls;
 import javafx.scene.control.Label;
+import javafx.scene.paint.Color;
+
+import java.awt.*;
+import java.util.List;
 
 import static javafx.geometry.Pos.BOTTOM_CENTER;
 import static javafx.geometry.Pos.BOTTOM_LEFT;
@@ -10,8 +14,6 @@ import static javafx.scene.paint.Color.*;
 
 @SuppressWarnings("SameParameterValue")
 public class Main extends Application {
-
-    private final Vector cameraLine = new Vector(0, 0, -2 * WORLD_SIZE_Z);
 
     private int cameraStep;
 
@@ -33,11 +35,11 @@ public class Main extends Application {
 
     private final String title;
 
-    private final Slidouble airBrake = new Slidouble("airBrake", .025);
-
     private final Slidouble gravConstant = new Slidouble("gravConstant", .1);
 
-    private final Slidouble collisionBrake = new Slidouble("collisionBrake", .025d);
+    private final Slidouble airBrake = new Slidouble("airBrake", .25);
+
+    private final Slidouble collisionBrake = new Slidouble("collisionBrake", .35d);
 
     private final Slidouble wallBrake = new Slidouble("wallBrake", .5d);
 
@@ -62,17 +64,44 @@ public class Main extends Application {
 
     private final PerspectiveCamera camera = new PerspectiveCamera(true);
 
-    private final Slider slider = new Slider(0.000, 1, 0.1);
+    private final Slider slider = new Slider(0.000, 1, 0.01);
 
     private final VBox sliderBox = new VBox(2, label, slider);
 
     private final SlidoubleListener slidoubleListener = new SlidoubleListener(label, slider, slidableSlidouble);
 
+    private final int worldSizeX;
+
+    private final int worldSizeZ;
+
+    private final int worldSizeY;
+
+    {
+        GraphicsDevice[] devices = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
+        GraphicsDevice device = Arrays.stream(
+                devices
+            ).max(Comparator.comparing(graphicsDevice ->
+                graphicsDevice.getDisplayMode().getWidth()))
+            .orElseThrow();
+
+        worldSizeX = 8 * device.getDisplayMode().getWidth() / 10;
+        worldSizeZ = worldSizeX;
+        worldSizeY = 8 * device.getDisplayMode().getHeight() / 10;
+    }
+
+    private final int zBound = worldSizeZ / 2;
+
+    private final Vector cameraLine = new Vector(0, 0, -2 * worldSizeZ);
+
+    private final int xBound = worldSizeX / 2;
+
+    private final int yBound = worldSizeY / 2;
+
     {
         label.setTextFill(BLACK);
 
         camera.setNearClip(1);
-        camera.setFarClip(5 * WORLD_SIZE_Z);
+        camera.setFarClip(5 * worldSizeZ);
         camera.setRotationAxis(Rotate.Y_AXIS);
         camera.setRotate(0);
 
@@ -91,7 +120,8 @@ public class Main extends Application {
         this.title = "Stars";
 
         res = objects(
-            COUNT, i ->
+            COUNT,
+            i ->
                 new Re(
                     10,
                     RE_RANGE.point(i, COUNT),
@@ -100,7 +130,11 @@ public class Main extends Application {
                 ), Re.class
         );
 
-        positions = objects(COUNT, _ -> new Vector(new Range(-randomRange(), randomRange())), Vector.class);
+        positions = objects(
+            COUNT,
+            _ ->
+                new Vector(new Range(-randomRange(), randomRange())), Vector.class
+        );
 
         accelerations = zeroes(COUNT);
 
@@ -109,7 +143,8 @@ public class Main extends Application {
         collisionImpulses = objects(COUNT, _ -> ZERO, Vector.class);
 
         materials = objects(
-            COUNT, i -> {
+            COUNT,
+            i -> {
                 PhongMaterial phong = new PhongMaterial();
                 phong.diffuseColorProperty().set(res[i].rgb(1, 1));
                 return phong;
@@ -132,16 +167,16 @@ public class Main extends Application {
         AmbientLight ambient = new AmbientLight(Color.color(.3, .3, 0.5));
 
         PointLight pl1 = new PointLight(WHITE);
-        pl1.setTranslateX(-(.4 * WORLD_SIZE_X));
-        pl1.setTranslateY(.4 * WORLD_SIZE_Y);
-        pl1.setTranslateZ(.5 * WORLD_SIZE_X);
+        pl1.setTranslateX(-(.4 * worldSizeX));
+        pl1.setTranslateY(.4 * worldSizeY);
+        pl1.setTranslateZ(.5 * worldSizeX);
 
         PointLight pl2 = new PointLight(WHITE);
-        pl2.setTranslateX(.4 * WORLD_SIZE_X);
-        pl2.setTranslateY(-4 * WORLD_SIZE_Y);
-        pl2.setTranslateZ(-.5 * WORLD_SIZE_Z);
+        pl2.setTranslateX(.4 * worldSizeX);
+        pl2.setTranslateY(-4 * worldSizeY);
+        pl2.setTranslateZ(-.5 * worldSizeZ);
 
-        List<Node> wire = wires(X_BOUND, Y_BOUND, Z_BOUND);
+        List<Node> wire = wires(xBound, yBound, zBound);
 
         Stream<Node> nodeStream = Stream.of(
             Stream.of(ambient, pl1, pl2, origo),
@@ -153,8 +188,8 @@ public class Main extends Application {
         Group world = new Group(nodes);
         subScene = new SubScene(
             world,
-            WORLD_SIZE_X,
-            WORLD_SIZE_Y,
+            worldSizeX,
+            worldSizeY,
             true,
             SceneAntialiasing.BALANCED
         );
@@ -167,6 +202,7 @@ public class Main extends Application {
     @Override
     public void start(Stage stage) {
         // Create the gravitational constant slider
+        ;
 
         slidableSlidouble.set(gravConstant);
 
@@ -188,18 +224,17 @@ public class Main extends Application {
     }
 
     private Scene setScene(StackPane root) {
-        Scene scene = new Scene(root, WORLD_SIZE_X, WORLD_SIZE_Y + 60, true);
+        Scene scene = new Scene(root, worldSizeX, worldSizeY + 60, true);
         scene.setOnKeyPressed(event -> {
             switch (event.getCode()) {
-                case UP ->
-                    currentSlidableSlidouble = (currentSlidableSlidouble + 1) % slidableSlidoubles.size();
+                case UP -> currentSlidableSlidouble = (currentSlidableSlidouble + 1) % slidableSlidoubles.size();
                 case DOWN -> {
                     int newIndex = (currentSlidableSlidouble - 1) % slidableSlidoubles.size();
                     currentSlidableSlidouble = newIndex < 0 ? slidableSlidoubles.size() - 1 : newIndex;
                 }
                 case Z -> {
                     for (Slidouble zeroable : zeroables) {
-                        zeroable.zero();
+                        zeroable.max();
                     }
                 }
                 case S -> {
@@ -267,7 +302,7 @@ public class Main extends Application {
 
     private void setOpacity(int i) {
         double distToOrigo = positions[i].length();
-        double opa = 1 - distToOrigo / WORLD_SIZE_X;
+        double opa = 1 - distToOrigo / worldSizeX;
         materials[i].setDiffuseColor(res[i].rgb(opa, opa));
     }
 
@@ -300,33 +335,33 @@ public class Main extends Application {
 
         boolean h = false;
 
-        if (px < -X_BOUND + r) {
+        if (px < -xBound + r) {
             vx = Math.abs(vx);
-            px = -X_BOUND + r + 1;
+            px = -xBound + r + 1;
             h = true;
-        } else if (px > X_BOUND - r) {
+        } else if (px > xBound - r) {
             vx = -Math.abs(vx);
-            px = X_BOUND - r - 1;
+            px = xBound - r - 1;
             h = true;
         }
 
-        if (py < -Y_BOUND + r) {
+        if (py < -yBound + r) {
             vy = Math.abs(vy);
-            py = -Y_BOUND + r + 1;
+            py = -yBound + r + 1;
             h = true;
-        } else if (py > Y_BOUND - r) {
+        } else if (py > yBound - r) {
             vy = -Math.abs(vy);
-            py = Y_BOUND - r - 1;
+            py = yBound - r - 1;
             h = true;
         }
 
-        if (pz < -Z_BOUND + r) {
+        if (pz < -zBound + r) {
             vz = Math.abs(vz);
-            pz = -Z_BOUND + r + 1;
+            pz = -zBound + r + 1;
             h = true;
-        } else if (pz > Z_BOUND - r) {
+        } else if (pz > zBound - r) {
             vz = -Math.abs(vz);
-            pz = Z_BOUND - r - 1;
+            pz = zBound - r - 1;
             h = true;
         }
 
@@ -402,31 +437,19 @@ public class Main extends Application {
         return gravConstant.times(re.weight()) / (distance * distance);
     }
 
-    static final int COUNT = 50;
+    private double randomRange() {
+        return worldSizeZ * 0.48;
+    }
+
+    static final int COUNT = 256;
 
     static final Range RE_RANGE = new Range(5, 50);
-
-    static final int WORLD_SIZE_X = 1440;
-
-    static final int WORLD_SIZE_Y = 900;
-
-    static final int WORLD_SIZE_Z = WORLD_SIZE_X;
-
-    static final int Z_BOUND = WORLD_SIZE_Z / 2;
-
-    static final int X_BOUND = WORLD_SIZE_X / 2;
-
-    static final int Y_BOUND = WORLD_SIZE_Y / 2;
 
     static final int CAMERA_STEPS = 21600;
 
     static final double COLOUR_RANGE = 0.85;
 
     static Vector ZERO = new Vector();
-
-    private static double randomRange() {
-        return WORLD_SIZE_Z * 0.48;
-    }
 
     private static Re.Color color(int i, int count) {
         double ratio = 1d * i / count;
