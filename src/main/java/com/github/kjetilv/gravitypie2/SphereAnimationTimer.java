@@ -1,10 +1,9 @@
 package com.github.kjetilv.gravitypie2;
 
-import javafx.animation.AnimationTimer;
+import module java.base;
+import module javafx.controls;
 
 import java.time.Duration;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 
 final class SphereAnimationTimer extends AnimationTimer {
 

@@ -1,11 +1,8 @@
 package com.github.kjetilv.gravitypie2;
 
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
+import module java.base;
+import module javafx.controls;
 import javafx.scene.control.Label;
-import javafx.scene.control.Slider;
-
-import java.util.concurrent.atomic.AtomicReference;
 
 final class SlidoubleListener implements ChangeListener<Number> {
 

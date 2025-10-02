@@ -1,6 +1,6 @@
 package com.github.kjetilv.gravitypie2;
 
-import java.util.Random;
+import module java.base;
 
 import static java.lang.Math.pow;
 import static java.lang.Math.sqrt;

@@ -1,43 +1,12 @@
 package com.github.kjetilv.gravitypie2;
 
-import javafx.application.Application;
-import javafx.scene.AmbientLight;
-import javafx.scene.Group;
-import javafx.scene.Node;
-import javafx.scene.PerspectiveCamera;
-import javafx.scene.PointLight;
-import javafx.scene.Scene;
-import javafx.scene.SceneAntialiasing;
-import javafx.scene.SubScene;
+import module java.base;
+import module javafx.controls;
 import javafx.scene.control.Label;
-import javafx.scene.control.Slider;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.paint.Material;
-import javafx.scene.paint.PhongMaterial;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.Sphere;
-import javafx.scene.transform.Rotate;
-import javafx.stage.Stage;
-
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.function.IntFunction;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static javafx.geometry.Pos.BOTTOM_CENTER;
 import static javafx.geometry.Pos.BOTTOM_LEFT;
-import static javafx.scene.paint.Color.BLACK;
-import static javafx.scene.paint.Color.GHOSTWHITE;
-import static javafx.scene.paint.Color.WHITE;
+import static javafx.scene.paint.Color.*;
 
 @SuppressWarnings("SameParameterValue")
 public class Main extends Application {
@@ -437,9 +406,9 @@ public class Main extends Application {
 
     static final Range RE_RANGE = new Range(5, 50);
 
-    static final int WORLD_SIZE_X = 1440 / 2;
+    static final int WORLD_SIZE_X = 1440;
 
-    static final int WORLD_SIZE_Y = 900 / 2;
+    static final int WORLD_SIZE_Y = 900;
 
     static final int WORLD_SIZE_Z = WORLD_SIZE_X;
 
