@@ -66,22 +66,34 @@ public class Main extends Application {
             wallBrake.value(1d);
         },
         () -> {
-            gravConstant.value(.05d);
-            airBrake.value(.06d);
-            collisionBrake.value(.28d);
+            gravConstant.value(.04d);
+            airBrake.value(.07d);
+            collisionBrake.value(.23d);
             wallBrake.value(.32d);
+        },
+        () -> {
+            gravConstant.value(.01);
+            airBrake.value(.1d);
+            collisionBrake.value(0d);
+            wallBrake.value(.85d);
         },
         () -> {
             gravConstant.value(.04512);
             airBrake.value(.03);
             collisionBrake.value(.71);
-            wallBrake.value(0);
+            wallBrake.value(0d);
         },
         () -> {
             gravConstant.value(0.15662d);
             airBrake.value(.03d);
             collisionBrake.value(0.94d);
-            wallBrake.value(0);
+            wallBrake.value(0d);
+        },
+        () -> {
+            gravConstant.value(0.07);
+            airBrake.value(0d);
+            collisionBrake.value(0.68d);
+            wallBrake.value(0d);
         }
     );
 
