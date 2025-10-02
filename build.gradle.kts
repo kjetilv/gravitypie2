@@ -14,12 +14,12 @@ repositories {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(22))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
     withSourcesJar()
     modularity.inferModulePath
-    sourceCompatibility = JavaVersion.VERSION_22
-    targetCompatibility = JavaVersion.VERSION_22
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 application {
@@ -33,7 +33,7 @@ tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
 }
 
-val javafxVersion = "22"
+val javafxVersion = "25"
 
 javafx {
     version = javafxVersion
@@ -43,7 +43,7 @@ javafx {
 dependencies {
     // Your app deps here
 
-    testImplementation(platform("org.junit:junit-bom:5.10.0"))
+    testImplementation(platform("org.junit:junit-bom:5.13.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
