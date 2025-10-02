@@ -1,7 +1,14 @@
 package com.github.kjetilv.gravitypie2;
 
 import javafx.application.Application;
-import javafx.scene.*;
+import javafx.scene.AmbientLight;
+import javafx.scene.Group;
+import javafx.scene.Node;
+import javafx.scene.PerspectiveCamera;
+import javafx.scene.PointLight;
+import javafx.scene.Scene;
+import javafx.scene.SceneAntialiasing;
+import javafx.scene.SubScene;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.StackPane;
@@ -28,14 +35,12 @@ import java.util.stream.Stream;
 
 import static javafx.geometry.Pos.BOTTOM_CENTER;
 import static javafx.geometry.Pos.BOTTOM_LEFT;
-import static javafx.scene.paint.Color.*;
+import static javafx.scene.paint.Color.BLACK;
+import static javafx.scene.paint.Color.GHOSTWHITE;
+import static javafx.scene.paint.Color.WHITE;
 
 @SuppressWarnings("SameParameterValue")
 public class Main extends Application {
-
-    static void main(String[] args) {
-        launch(args);
-    }
 
     private final Vector cameraLine = new Vector(0, 0, -2 * WORLD_SIZE_Z);
 
@@ -44,8 +49,6 @@ public class Main extends Application {
     private final Sphere[] spheres;
 
     private final Re[] res;
-
-    private final Temperature[] temperatures;
 
     private final PhongMaterial[] materials;
 
@@ -61,11 +64,11 @@ public class Main extends Application {
 
     private final String title;
 
-    private final Slidouble airBrake = new Slidouble("airBrake", .25);
+    private final Slidouble airBrake = new Slidouble("airBrake", .025);
 
-    private final Slidouble gravConstant = new Slidouble("gravConstant", .05);
+    private final Slidouble gravConstant = new Slidouble("gravConstant", .1);
 
-    private final Slidouble collisionBrake = new Slidouble("collisionBrake", .25d);
+    private final Slidouble collisionBrake = new Slidouble("collisionBrake", .025d);
 
     private final Slidouble wallBrake = new Slidouble("wallBrake", .5d);
 
@@ -133,8 +136,6 @@ public class Main extends Application {
         accelerations = zeroes(COUNT);
 
         velocities = zeroes(COUNT);
-
-        temperatures = objects(COUNT, _ -> new Temperature(ROOM_TEMP), Temperature.class);
 
         collisionImpulses = objects(COUNT, _ -> ZERO, Vector.class);
 
@@ -432,13 +433,13 @@ public class Main extends Application {
         return gravConstant.times(re.weight()) / (distance * distance);
     }
 
-    static final int COUNT = 500;
+    static final int COUNT = 50;
 
     static final Range RE_RANGE = new Range(5, 50);
 
-    static final int WORLD_SIZE_X = 1440;
+    static final int WORLD_SIZE_X = 1440 / 2;
 
-    static final int WORLD_SIZE_Y = 900;
+    static final int WORLD_SIZE_Y = 900 / 2;
 
     static final int WORLD_SIZE_Z = WORLD_SIZE_X;
 
@@ -451,8 +452,6 @@ public class Main extends Application {
     static final int CAMERA_STEPS = 21600;
 
     static final double COLOUR_RANGE = 0.85;
-
-    static final double ROOM_TEMP = 0.25;
 
     static Vector ZERO = new Vector();
 
