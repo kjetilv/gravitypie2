@@ -14,12 +14,12 @@ repositories {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
+        languageVersion.set(JavaLanguageVersion.of(22))
     }
     withSourcesJar()
     modularity.inferModulePath
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
+    sourceCompatibility = JavaVersion.VERSION_22
+    targetCompatibility = JavaVersion.VERSION_22
 }
 
 application {
@@ -33,7 +33,7 @@ tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
 }
 
-val javafxVersion = "25"
+val javafxVersion = "22"
 
 javafx {
     version = javafxVersion

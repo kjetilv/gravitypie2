@@ -7,10 +7,6 @@ record Re(
     Color color
 ) {
 
-    public javafx.scene.paint.Color rgb() {
-        return rgb(1d, -1);
-    }
-
     public javafx.scene.paint.Color rgb(double dim, double opa) {
         Color cc = color();
         return new javafx.scene.paint.Color(

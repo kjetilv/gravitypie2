@@ -31,36 +31,8 @@ record Vector(double x, double y, double z) {
         return x == 0d && y == 0d && z == 0d;
     }
 
-    Vector x(double x) {
-        return new Vector(x, y, z);
-    }
-
-    Vector y(double y) {
-        return new Vector(x, y, z);
-    }
-
-    Vector z(double z) {
-        return new Vector(x, y, z);
-    }
-
     double dot(Vector v) {
         return x * v.x + y * v.y + z * v.z;
-    }
-
-    Vector flip() {
-        return new Vector(-x, -y, -z);
-    }
-
-    Vector flipX() {
-        return new Vector(-x, y, z);
-    }
-
-    Vector flipY() {
-        return new Vector(x, -y, z);
-    }
-
-    Vector flipZ() {
-        return new Vector(x, y, -z);
     }
 
     Vector mul(double d) {
@@ -91,35 +63,6 @@ record Vector(double x, double y, double z) {
             pow(y - v.y, 2) +
             pow(z - v.z, 2)
         );
-    }
-
-    /**
-     * Calculates the angle between to another vector.
-     *
-     * @param v vector
-     * @return the angle in radians between the two vectors
-     */
-    double angleBetween(Vector v) {
-        // Calculate dot product
-        double dotProduct = x * v.x + y * v.y + z * v.z;
-
-        // Calculate magnitudes
-        double length = length();
-        double vLength = v.length();
-
-        // Handle zero vectors to avoid division by zero
-        if (length == 0 || vLength == 0) {
-            return 0.0;
-        }
-
-        // Calculate cosine of the angle
-        double cosine = dotProduct / (length * vLength);
-
-        // Handle floating point errors that might cause cosine to be slightly outside [-1, 1]
-        cosine = Math.max(-1.0, Math.min(1.0, cosine));
-
-        // Return the angle in radians
-        return Math.acos(cosine);
     }
 
     private static final Random RND = new Random();

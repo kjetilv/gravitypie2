@@ -1,7 +1,14 @@
 package com.github.kjetilv.gravitypie2;
 
 import javafx.application.Application;
-import javafx.scene.*;
+import javafx.scene.AmbientLight;
+import javafx.scene.Group;
+import javafx.scene.Node;
+import javafx.scene.PerspectiveCamera;
+import javafx.scene.PointLight;
+import javafx.scene.Scene;
+import javafx.scene.SceneAntialiasing;
+import javafx.scene.SubScene;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.StackPane;
@@ -33,7 +40,7 @@ import static javafx.scene.paint.Color.*;
 @SuppressWarnings("SameParameterValue")
 public class Main extends Application {
 
-    static void main(String[] args) {
+    public static void main(String[] args) {
         launch(args);
     }
 
@@ -44,8 +51,6 @@ public class Main extends Application {
     private final Sphere[] spheres;
 
     private final Re[] res;
-
-    private final Temperature[] temperatures;
 
     private final PhongMaterial[] materials;
 
@@ -133,8 +138,6 @@ public class Main extends Application {
         accelerations = zeroes(COUNT);
 
         velocities = zeroes(COUNT);
-
-        temperatures = objects(COUNT, _ -> new Temperature(ROOM_TEMP), Temperature.class);
 
         collisionImpulses = objects(COUNT, _ -> ZERO, Vector.class);
 
@@ -451,8 +454,6 @@ public class Main extends Application {
     static final int CAMERA_STEPS = 21600;
 
     static final double COLOUR_RANGE = 0.85;
-
-    static final double ROOM_TEMP = 0.25;
 
     static Vector ZERO = new Vector();
 
