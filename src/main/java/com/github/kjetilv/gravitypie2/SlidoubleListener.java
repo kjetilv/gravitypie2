@@ -31,6 +31,10 @@ final class SlidoubleListener implements ChangeListener<Number> {
         relabel();
     }
 
+    public void refresh() {
+        this.slider.setValue(ref.get().value());
+    }
+
     private void relabel() {
         Slidouble slidouble = ref.get();
         if (slidouble != null) {

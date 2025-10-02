@@ -6,6 +6,10 @@ final class Slidouble {
 
     private double value;
 
+    Slidouble(String name) {
+        this(name, 0.0d);
+    }
+
     Slidouble(String name, double value) {
         this.name = name;
         value(value);
@@ -34,10 +38,6 @@ final class Slidouble {
 
     public double mirrorTimes(double d) {
         return (1 - value) * d;
-    }
-
-    public void max() {
-        value(1d);
     }
 
     String labelString() {

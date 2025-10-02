@@ -35,13 +35,13 @@ public class Main extends Application {
 
     private final String title;
 
-    private final Slidouble gravConstant = new Slidouble("gravConstant", .1);
+    private final Slidouble gravConstant = new Slidouble("gravConstant");
 
-    private final Slidouble airBrake = new Slidouble("airBrake", .25);
+    private final Slidouble airBrake = new Slidouble("airBrake");
 
-    private final Slidouble collisionBrake = new Slidouble("collisionBrake", .35d);
+    private final Slidouble collisionBrake = new Slidouble("collisionBrake");
 
-    private final Slidouble wallBrake = new Slidouble("wallBrake", .5d);
+    private final Slidouble wallBrake = new Slidouble("wallBrake");
 
     private final AtomicReference<Slidouble> slidableSlidouble = new AtomicReference<>();
 
@@ -56,6 +56,33 @@ public class Main extends Application {
         airBrake,
         collisionBrake,
         wallBrake
+    );
+
+    private final List<Runnable> presets = List.of(
+        () -> {
+            gravConstant.value(0d);
+            airBrake.value(1d);
+            collisionBrake.value(1d);
+            wallBrake.value(1d);
+        },
+        () -> {
+            gravConstant.value(.05d);
+            airBrake.value(.06d);
+            collisionBrake.value(.28d);
+            wallBrake.value(.32d);
+        },
+        () -> {
+            gravConstant.value(.04512);
+            airBrake.value(.03);
+            collisionBrake.value(.71);
+            wallBrake.value(0);
+        },
+        () -> {
+            gravConstant.value(0.15662d);
+            airBrake.value(.03d);
+            collisionBrake.value(0.94d);
+            wallBrake.value(0);
+        }
     );
 
     private int currentSlidableSlidouble = 0;
@@ -76,6 +103,14 @@ public class Main extends Application {
 
     private final int worldSizeY;
 
+    private final Vector cameraLine;
+
+    private final int zBound;
+
+    private final int xBound;
+
+    private final int yBound;
+
     {
         GraphicsDevice[] devices = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
         GraphicsDevice device = Arrays.stream(
@@ -87,17 +122,13 @@ public class Main extends Application {
         worldSizeX = 8 * device.getDisplayMode().getWidth() / 10;
         worldSizeZ = worldSizeX;
         worldSizeY = 8 * device.getDisplayMode().getHeight() / 10;
-    }
 
-    private final int zBound = worldSizeZ / 2;
+        zBound = worldSizeZ / 2;
+        xBound = worldSizeX / 2;
+        yBound = worldSizeY / 2;
 
-    private final Vector cameraLine = new Vector(0, 0, -2 * worldSizeZ);
+        cameraLine = new Vector(0, 0, -2 * worldSizeZ);
 
-    private final int xBound = worldSizeX / 2;
-
-    private final int yBound = worldSizeY / 2;
-
-    {
         label.setTextFill(BLACK);
 
         camera.setNearClip(1);
@@ -196,14 +227,12 @@ public class Main extends Application {
         subScene.setFill(BLACK);
         subScene.setCamera(camera);
 
-        refreshSlider();
+        changeSlider();
+        preset(1);
     }
 
     @Override
     public void start(Stage stage) {
-        // Create the gravitational constant slider
-        ;
-
         slidableSlidouble.set(gravConstant);
 
         // Update the constant when slider changes
@@ -232,11 +261,6 @@ public class Main extends Application {
                     int newIndex = (currentSlidableSlidouble - 1) % slidableSlidoubles.size();
                     currentSlidableSlidouble = newIndex < 0 ? slidableSlidoubles.size() - 1 : newIndex;
                 }
-                case Z -> {
-                    for (Slidouble zeroable : zeroables) {
-                        zeroable.max();
-                    }
-                }
                 case S -> {
                     String summary = slidableSlidoubles.stream()
                         .map(Objects::toString)
@@ -245,11 +269,21 @@ public class Main extends Application {
                 }
                 case Q -> System.exit(0);
                 default -> {
+                    if (event.getCode().isDigitKey()) {
+                        preset(event.getCode().getCode() - '0');
+                    }
                 }
             }
-            refreshSlider();
+            changeSlider();
         });
         return scene;
+    }
+
+    private void preset(int i) {
+        if (i < presets.size()) {
+            presets.get(i).run();
+            refreshSlider();
+        }
     }
 
     private void showStage(Stage stage, Scene scene) {
@@ -259,8 +293,12 @@ public class Main extends Application {
         stage.show();
     }
 
-    private void refreshSlider() {
+    private void changeSlider() {
         slidoubleListener.nowDo(slidableSlidoubles.get(currentSlidableSlidouble));
+    }
+
+    private void refreshSlider() {
+        slidoubleListener.refresh();
     }
 
     private void update() {
