@@ -77,6 +77,12 @@ public class Main extends Application {
         wallBrake
     );
 
+    private final List<Slidouble> zeroables = List.of(
+        airBrake,
+        collisionBrake,
+        wallBrake
+    );
+
     private int currentSlidableSlidouble = 0;
 
     private final Label label = new Label();
@@ -110,7 +116,7 @@ public class Main extends Application {
             COUNT, i ->
                 new Re(
                     10,
-                    R_RANGE.point(i, COUNT),
+                    RE_RANGE.point(i, COUNT),
                     1L,
                     color(i, COUNT)
                 ), Re.class
@@ -214,6 +220,10 @@ public class Main extends Application {
                 } else if (event.getCode() == KeyCode.DOWN) {
                     int newIndex = (currentSlidableSlidouble - 1) % slidableSlidoubles.size();
                     currentSlidableSlidouble = newIndex < 0 ? slidableSlidoubles.size() - 1 : newIndex;
+                } else if (event.getCode() == KeyCode.Z) {
+                    for (Slidouble zeroable : zeroables) {
+                        zeroable.zero();
+                    }
                 }
                 refreshSlider();
             }
@@ -400,7 +410,7 @@ public class Main extends Application {
 
     static final int COUNT = 500;
 
-    static final Range R_RANGE = new Range(20, 50);
+    static final Range RE_RANGE = new Range(5, 50);
 
     static final int WORLD_SIZE_X = 1440;
 

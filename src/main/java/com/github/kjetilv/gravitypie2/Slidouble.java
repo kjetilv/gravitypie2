@@ -31,6 +31,10 @@ final class Slidouble {
         return (1 - value) * rawImpulse;
     }
 
+    public void zero() {
+        value(0.25d);
+    }
+
     String labelString() {
         return String.format(name + ": %.4f", value);
     }
