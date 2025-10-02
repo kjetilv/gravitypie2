@@ -4,7 +4,6 @@ import javafx.application.Application;
 import javafx.scene.*;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
-import javafx.scene.input.KeyCode;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -19,9 +18,11 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -60,13 +61,13 @@ public class Main extends Application {
 
     private final String title;
 
-    private final Slidouble airBrake = new Slidouble("Air brake", .25);
+    private final Slidouble airBrake = new Slidouble("airBrake", .25);
 
-    private final Slidouble gravConstant = new Slidouble("Gravity", .05);
+    private final Slidouble gravConstant = new Slidouble("gravConstant", .05);
 
-    private final Slidouble collisionBrake = new Slidouble("Collision brake", .25d);
+    private final Slidouble collisionBrake = new Slidouble("collisionBrake", .25d);
 
-    private final Slidouble wallBrake = new Slidouble("Wall brake", .5d);
+    private final Slidouble wallBrake = new Slidouble("wallBrake", .5d);
 
     private final AtomicReference<Slidouble> slidableSlidouble = new AtomicReference<>();
 
@@ -91,6 +92,8 @@ public class Main extends Application {
 
     private final Slider slider = new Slider(0.000, 1, 0.1);
 
+    private final VBox sliderBox = new VBox(2, label, slider);
+
     private final SlidoubleListener slidoubleListener = new SlidoubleListener(label, slider, slidableSlidouble);
 
     {
@@ -107,6 +110,9 @@ public class Main extends Application {
         slider.setMinorTickCount(5);
         slider.setBlockIncrement(0.01);
         slider.setPrefWidth(200);
+
+        sliderBox.setPadding(new javafx.geometry.Insets(2));
+        sliderBox.setStyle("-fx-background-color: rgba(0, 0, 0, 0); -fx-background-radius: 5;");
     }
 
     public Main() {
@@ -197,39 +203,55 @@ public class Main extends Application {
         // Update the constant when slider changes
         slider.valueProperty().addListener(slidoubleListener);
 
-        // Create a container for the slider with label
-        VBox sliderBox = new VBox(2, label, slider);
-        sliderBox.setPadding(new javafx.geometry.Insets(2));
-        sliderBox.setStyle("-fx-background-color: rgba(0, 0, 0, 0); -fx-background-radius: 5;");
+        StackPane root = buildRootStackPane(sliderBox);
+        Scene scene = setScene(root);
+        showStage(stage, scene);
 
+        new SphereAnimationTimer(this::update).start();
+    }
+
+    private StackPane buildRootStackPane(VBox sliderBox) {
         StackPane root = new StackPane(subScene, sliderBox);
         StackPane.setAlignment(sliderBox, BOTTOM_LEFT);
         StackPane.setAlignment(subScene, BOTTOM_CENTER);
+        return root;
+    }
 
+    private Scene setScene(StackPane root) {
         Scene scene = new Scene(root, WORLD_SIZE_X, WORLD_SIZE_Y + 60, true);
-        stage.setTitle(title);
-        stage.setScene(scene);
-        stage.setResizable(true);
-        stage.show();
-
         scene.setOnKeyPressed(event -> {
-            Slidouble current = slidableSlidouble.get();
-            if (current != null) {
-                if (event.getCode() == KeyCode.UP) {
+            switch (event.getCode()) {
+                case UP ->
                     currentSlidableSlidouble = (currentSlidableSlidouble + 1) % slidableSlidoubles.size();
-                } else if (event.getCode() == KeyCode.DOWN) {
+                case DOWN -> {
                     int newIndex = (currentSlidableSlidouble - 1) % slidableSlidoubles.size();
                     currentSlidableSlidouble = newIndex < 0 ? slidableSlidoubles.size() - 1 : newIndex;
-                } else if (event.getCode() == KeyCode.Z) {
+                }
+                case Z -> {
                     for (Slidouble zeroable : zeroables) {
                         zeroable.zero();
                     }
                 }
-                refreshSlider();
+                case S -> {
+                    String summary = slidableSlidoubles.stream()
+                        .map(Objects::toString)
+                        .collect(Collectors.joining(", "));
+                    System.out.println(summary);
+                }
+                case Q -> System.exit(0);
+                default -> {
+                }
             }
+            refreshSlider();
         });
+        return scene;
+    }
 
-        new SphereAnimationTimer(this::update).start();
+    private void showStage(Stage stage, Scene scene) {
+        stage.setTitle(title);
+        stage.setScene(scene);
+        stage.setResizable(true);
+        stage.show();
     }
 
     private void refreshSlider() {
@@ -365,11 +387,13 @@ public class Main extends Application {
         Vector pos = positions[i];
         Re re = res[i];
         Vector pull = ZERO;
-        for (int j = 0; j < COUNT; j++) {
-            if (i != j) {
-                double force = pullFrom(positions[j], pos, re);
-                pull = pull.plus(positions[j].minus(pos).mul(force));
-            }
+        for (int j = 0; j < i; j++) {
+            double force = pullFrom(positions[j], pos, re);
+            pull = pull.plus(positions[j].minus(pos).mul(force));
+        }
+        for (int j = i + 1; j < COUNT; j++) {
+            double force = pullFrom(positions[j], pos, re);
+            pull = pull.plus(positions[j].minus(pos).mul(force));
         }
         return pull;
     }

@@ -27,8 +27,13 @@ final class Slidouble {
         return 1 - value;
     }
 
-    public double mirrorTimes(double rawImpulse) {
-        return (1 - value) * rawImpulse;
+    @Override
+    public String toString() {
+        return name +":" + String.format("%.5f", value);
+    }
+
+    public double mirrorTimes(double d) {
+        return (1 - value) * d;
     }
 
     public void zero() {
