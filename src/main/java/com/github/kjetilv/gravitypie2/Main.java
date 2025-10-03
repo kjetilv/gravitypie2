@@ -43,19 +43,23 @@ public class Main extends Application {
 
     private final Slidouble wallBrake = new Slidouble("wallBrake");
 
+    private final Slidouble gravityWell = new Slidouble("gravityWell");
+
     private final AtomicReference<Slidouble> slidableSlidouble = new AtomicReference<>();
 
     private final List<Slidouble> slidableSlidoubles = List.of(
         gravConstant,
         airBrake,
         collisionBrake,
-        wallBrake
+        wallBrake,
+        gravityWell
     );
 
     private final List<Slidouble> zeroables = List.of(
         airBrake,
         collisionBrake,
-        wallBrake
+        wallBrake,
+        gravityWell
     );
 
     private final List<Runnable> presets = List.of(
@@ -64,36 +68,42 @@ public class Main extends Application {
             airBrake.value(1d);
             collisionBrake.value(1d);
             wallBrake.value(1d);
+            gravityWell.value(0d);
         },
         () -> {
             gravConstant.value(.04d);
             airBrake.value(.07d);
             collisionBrake.value(.23d);
             wallBrake.value(.32d);
+            gravityWell.value(0d);
         },
         () -> {
             gravConstant.value(.01);
             airBrake.value(.1d);
             collisionBrake.value(0d);
             wallBrake.value(.85d);
+            gravityWell.value(0d);
         },
         () -> {
             gravConstant.value(.04512);
             airBrake.value(.03);
             collisionBrake.value(.71);
             wallBrake.value(0d);
+            gravityWell.value(0d);
         },
         () -> {
             gravConstant.value(0.15662d);
             airBrake.value(.03d);
             collisionBrake.value(0.94d);
             wallBrake.value(0d);
+            gravityWell.value(0d);
         },
         () -> {
             gravConstant.value(0.07);
             airBrake.value(0d);
             collisionBrake.value(0.68d);
             wallBrake.value(0d);
+            gravityWell.value(0d);
         }
     );
 
@@ -123,17 +133,19 @@ public class Main extends Application {
 
     private final int yBound;
 
+    private GraphicsDevice device;
+
     {
         GraphicsDevice[] devices = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
-        GraphicsDevice device = Arrays.stream(
+        device = Arrays.stream(
                 devices
             ).max(Comparator.comparing(graphicsDevice ->
                 graphicsDevice.getDisplayMode().getWidth()))
             .orElseThrow();
 
-        worldSizeX = 8 * device.getDisplayMode().getWidth() / 10;
+        worldSizeX = 75 * device.getDisplayMode().getWidth() / 100;
         worldSizeZ = worldSizeX;
-        worldSizeY = 8 * device.getDisplayMode().getHeight() / 10;
+        worldSizeY = 75 * device.getDisplayMode().getHeight() / 100;
 
         zBound = worldSizeZ / 2;
         xBound = worldSizeX / 2;
@@ -232,7 +244,7 @@ public class Main extends Application {
         subScene = new SubScene(
             world,
             worldSizeX,
-            worldSizeY,
+            worldSizeY + SLIZER_VERTICALSPACE,
             true,
             SceneAntialiasing.BALANCED
         );
@@ -265,7 +277,7 @@ public class Main extends Application {
     }
 
     private Scene setScene(StackPane root) {
-        Scene scene = new Scene(root, worldSizeX, worldSizeY + 60, true);
+        Scene scene = new Scene(root, worldSizeX, worldSizeY + 120, true);
         scene.setOnKeyPressed(event -> {
             switch (event.getCode()) {
                 case UP -> currentSlidableSlidouble = (currentSlidableSlidouble + 1) % slidableSlidoubles.size();
@@ -302,6 +314,11 @@ public class Main extends Application {
         stage.setTitle(title);
         stage.setScene(scene);
         stage.setResizable(true);
+
+        Rectangle bounds = device.getDefaultConfiguration().getBounds();
+        stage.setX(bounds.getX() + (bounds.getWidth() - worldSizeX) / 2);
+        stage.setY(bounds.getY() + (bounds.getHeight() - (worldSizeY + SLIZER_VERTICALSPACE)) / 2);
+
         stage.show();
     }
 
@@ -317,6 +334,7 @@ public class Main extends Application {
         for (int i = 0; i < COUNT; i++) {
             accelerations[i] = updatePulls(i);
         }
+
         for (int i = 0; i < COUNT; i++) {
             velocities[i] = updateVelocity(i, velocities[i]);
         }
@@ -450,7 +468,10 @@ public class Main extends Application {
             double force = pullFrom(positions[j], pos, re);
             pull = pull.plus(positions[j].minus(pos).mul(force));
         }
-        return pull;
+        Vector heightVector = new Vector(0, pos.y() + yBound, 0);
+        double height = heightVector.length();
+        double groundPull = gravityWell.times(re.weight() / 10_000) / height * height;
+        return pull.plus(heightVector.mul(groundPull));
     }
 
     private void handleCollision(int i, int j) {
@@ -500,6 +521,8 @@ public class Main extends Application {
     static final double COLOUR_RANGE = 0.85;
 
     static Vector ZERO = new Vector();
+
+    private static final int SLIZER_VERTICALSPACE = 60;
 
     private static Re.Color color(int i, int count) {
         double ratio = 1d * i / count;
