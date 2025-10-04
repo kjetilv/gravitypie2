@@ -317,6 +317,16 @@ public class Main extends Application {
 
     private void update() {
         for (int i = 0; i < COUNT; i++) {
+            for (int j = i + 1; j < COUNT; j++) {
+                handleCollision(i, j);
+            }
+        }
+
+        for (int i = 0; i < COUNT; i++) {
+            velocities[i] = applyCollisionImpulse(i, velocities[i]);
+        }
+
+        for (int i = 0; i < COUNT; i++) {
             accelerations[i] = updatePulls(i);
         }
 
@@ -335,16 +345,6 @@ public class Main extends Application {
 
         for (int i = 0; i < COUNT; i++) {
             setOpacity(i);
-        }
-
-        for (int i = 0; i < COUNT; i++) {
-            for (int j = i + 1; j < COUNT; j++) {
-                handleCollision(i, j);
-            }
-        }
-
-        for (int i = 0; i < COUNT; i++) {
-            velocities[i] = updateCollisionImpulse(i, velocities[i]);
         }
 
         moveCamera();
@@ -456,7 +456,7 @@ public class Main extends Application {
         }
     }
 
-    private Vector updateCollisionImpulse(Integer index, Vector v) {
+    private Vector applyCollisionImpulse(Integer index, Vector v) {
         Vector collisionImpulse = collisionImpulses[index];
         collisionImpulses[index] = ZERO;
         return v.plus(collisionImpulse);
