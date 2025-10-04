@@ -11,9 +11,12 @@ import java.util.List;
 import static javafx.geometry.Pos.BOTTOM_CENTER;
 import static javafx.geometry.Pos.BOTTOM_LEFT;
 import static javafx.scene.paint.Color.*;
+import static javafx.scene.transform.Rotate.Y_AXIS;
 
 @SuppressWarnings("SameParameterValue")
 public class Main extends Application {
+
+    public static final int GRAVITY_WELL_SCALE = 10_000;
 
     private int cameraStep;
 
@@ -157,7 +160,7 @@ public class Main extends Application {
 
         camera.setNearClip(1);
         camera.setFarClip(5 * worldSizeZ);
-        camera.setRotationAxis(Rotate.Y_AXIS);
+        camera.setRotationAxis(Y_AXIS);
         camera.setRotate(0);
 
         slider.setShowTickLabels(true);
@@ -197,23 +200,9 @@ public class Main extends Application {
 
         collisionImpulses = objects(COUNT, _ -> ZERO, Vector.class);
 
-        materials = objects(
-            COUNT,
-            i -> {
-                PhongMaterial phong = new PhongMaterial();
-                phong.diffuseColorProperty().set(res[i].rgb(1, 1));
-                return phong;
-            }, PhongMaterial.class
-        );
+        materials = objects(COUNT, this::material, PhongMaterial.class);
 
-        spheres = objects(
-            COUNT,
-            i -> {
-                Sphere sphere = new Sphere(res[i].radius());
-                sphere.setMaterial(materials[i]);
-                return sphere;
-            }, Sphere.class
-        );
+        spheres = objects(COUNT, this::sphere, Sphere.class);
 
         Sphere origo = new Sphere(4);
         Material blueMaterial = new PhongMaterial(GHOSTWHITE);
@@ -231,13 +220,12 @@ public class Main extends Application {
         pl2.setTranslateY(-4 * worldSizeY);
         pl2.setTranslateZ(-.5 * worldSizeZ);
 
-        List<Node> wire = wires(xBound, yBound, zBound);
-
-        Stream<Node> nodeStream = Stream.of(
-            Stream.of(ambient, pl1, pl2, origo),
-            Arrays.stream(spheres),
-            wire.stream()
-        ).flatMap(Function.identity());
+        Group wireBox =
+            Shapes.createWireBox(worldSizeX, worldSizeY, worldSizeZ);
+        Stream<Node> nodeStream = Stream.concat(
+            Stream.of(ambient, pl1, pl2, origo, wireBox),
+            Arrays.stream(spheres)
+        );
         List<Node> nodes = nodeStream.toList();
 
         Group world = new Group(nodes);
@@ -253,6 +241,18 @@ public class Main extends Application {
 
         updateSlider();
         preset(1);
+    }
+
+    private PhongMaterial material(int i) {
+        PhongMaterial phong = new PhongMaterial();
+        phong.diffuseColorProperty().set(res[i].rgb(1, 1));
+        return phong;
+    }
+
+    private Sphere sphere(int i) {
+        Sphere sphere = new Sphere(res[i].radius());
+        sphere.setMaterial(materials[i]);
+        return sphere;
     }
 
     @Override
@@ -517,8 +517,6 @@ public class Main extends Application {
 
     private static final int SLIZER_VERTICALSPACE = 60;
 
-    public static final int GRAVITY_WELL_SCALE = 10_000;
-
     private static Re.Color color(int i, int count) {
         double ratio = 1d * i / count;
         double angle = ratio * 3 * Math.PI;
@@ -538,69 +536,6 @@ public class Main extends Application {
         double raw = Math.max(0, r);
         double inRange = raw * COLOUR_RANGE;
         return 1.0 - COLOUR_RANGE + inRange;
-    }
-
-    private static List<Node> wires(double halfX, double halfY, double halfZ) {
-        List<Node> wire = new ArrayList<>();
-        // 12 edges of the box
-        double[] xs = new double[] {-halfX, halfX};
-        double[] ys = new double[] {-halfY, halfY};
-        double[] zs = new double[] {-halfZ, halfZ};
-        // Edges parallel to X at each combination of y,z
-        for (double y : ys) {
-            for (double z : zs) {
-                Line l = newLine();
-                start(l, -halfX, 0);
-                end(l, halfX, 0);
-                l.setTranslateY(y);
-                l.setTranslateZ(z);
-                wire.add(l);
-            }
-        }
-        // Edges parallel to Y at each combination of x,z
-        for (double x : xs) {
-            for (double z : zs) {
-                Line l = newLine();
-                start(l, 0, -halfY);
-                end(l, 0, halfY);
-                l.setTranslateX(x);
-                l.setTranslateZ(z);
-                wire.add(l);
-            }
-        }
-        // Edges parallel to Z at each combination of x,y
-        for (double x : xs) {
-            for (double y : ys) {
-                Line l = newLine();
-                // JavaFX 2D Line has no Z endpoints; approximate Z edges as Y lines rotated around X.
-                start(l, 0, -halfZ);
-                end(l, 0, halfZ);
-                l.setTranslateX(x);
-                l.setTranslateY(y);
-                l.setRotationAxis(Rotate.X_AXIS);
-                l.setRotate(90);
-                wire.add(l);
-            }
-        }
-        return wire;
-    }
-
-    private static Line newLine() {
-        Line l = new Line();
-        Color gridColor = Color.color(0.2, 0.8, 1.0, 0.4);
-        l.setStroke(gridColor);
-        l.setStrokeWidth(5d);
-        return l;
-    }
-
-    private static void start(Line l, double x, double y) {
-        l.setStartX(x);
-        l.setStartY(y);
-    }
-
-    private static void end(Line l, double x, double y) {
-        l.setEndX(x);
-        l.setEndY(y);
     }
 
     private static Vector[] zeroes(int count) {
