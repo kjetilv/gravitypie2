@@ -11,9 +11,9 @@ import static javafx.scene.transform.Rotate.Z_AXIS;
 
 final class Shapes {
 
-    public static final double WIRE_THICK = 1.5;
+    public static final double WIRE_THICK = 1.2;
 
-    public static final Color EDGE_COLOR = Color.color(.3d, .3d, .32d, .2d);
+    public static final Color EDGE_COLOR = Color.color(.3d, .3d, .32d, .1d);
 
     public static final PhongMaterial EDGE = new PhongMaterial(EDGE_COLOR);
 
