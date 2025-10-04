@@ -251,7 +251,7 @@ public class Main extends Application {
         subScene.setFill(BLACK);
         subScene.setCamera(camera);
 
-        changeSlider();
+        updateSlider();
         preset(1);
     }
 
@@ -298,16 +298,9 @@ public class Main extends Application {
                     }
                 }
             }
-            changeSlider();
+            updateSlider();
         });
         return scene;
-    }
-
-    private void preset(int i) {
-        if (i < presets.size()) {
-            presets.get(i).run();
-            refreshSlider();
-        }
     }
 
     private void showStage(Stage stage, Scene scene) {
@@ -322,14 +315,6 @@ public class Main extends Application {
         stage.show();
     }
 
-    private void changeSlider() {
-        slidoubleListener.nowDo(slidableSlidoubles.get(currentSlidableSlidouble));
-    }
-
-    private void refreshSlider() {
-        slidoubleListener.refresh();
-    }
-
     private void update() {
         for (int i = 0; i < COUNT; i++) {
             accelerations[i] = updatePulls(i);
@@ -337,9 +322,6 @@ public class Main extends Application {
 
         for (int i = 0; i < COUNT; i++) {
             velocities[i] = updateVelocity(i, velocities[i]);
-        }
-
-        for (int i = 0; i < COUNT; i++) {
             positions[i] = positions[i].plus(velocities[i]);
         }
 
@@ -368,28 +350,19 @@ public class Main extends Application {
         moveCamera();
     }
 
-    private void setOpacity(int i) {
-        double distToOrigo = positions[i].length();
-        double opa = 1 - distToOrigo / worldSizeX;
-        materials[i].setDiffuseColor(res[i].rgb(opa, opa));
+    private void preset(int i) {
+        if (i < presets.size()) {
+            presets.get(i).run();
+            slidoubleListener.refresh();
+        }
+    }
+
+    private void updateSlider() {
+        slidoubleListener.nowDo(slidableSlidoubles.get(currentSlidableSlidouble));
     }
 
     private Vector updateVelocity(Integer index, Vector v) {
         return v.plus(accelerations[index]).mul(airBrake.mirrorValue());
-    }
-
-    private Vector updateCollisionImpulse(Integer index, Vector v) {
-        Vector collisionImpulse = collisionImpulses[index];
-        collisionImpulses[index] = ZERO;
-        return v.plus(collisionImpulse);
-    }
-
-    private void moveSphere(int i) {
-        Vector p = positions[i];
-        Sphere s = spheres[i];
-        s.setTranslateX(p.x());
-        s.setTranslateY(p.y());
-        s.setTranslateZ(p.z());
     }
 
     private void handleWallBounce(int i) {
@@ -440,38 +413,18 @@ public class Main extends Application {
         }
     }
 
-    private void moveCamera() {
-        double angle = 2 * Math.PI * cameraStep / CAMERA_STEPS;
-        double x = Math.sin(angle) * cameraLine.length();
-        double z = Math.cos(angle) * cameraLine.length();
-
-        // Move the camera along the circle around origin
-        camera.setTranslateX(x);
-        camera.setTranslateY(0);
-        camera.setTranslateZ(z);
-
-        // Compute yaw (rotation around Y axis) and pitch (rotation around X axis)
-        camera.setRotate(Math.toDegrees(Math.atan2(-x, -z)));
-
-        cameraStep = (cameraStep - 1) % CAMERA_STEPS;
+    private void moveSphere(int i) {
+        Vector p = positions[i];
+        Sphere s = spheres[i];
+        s.setTranslateX(p.x());
+        s.setTranslateY(p.y());
+        s.setTranslateZ(p.z());
     }
 
-    private Vector updatePulls(int i) {
-        Vector pos = positions[i];
-        Re re = res[i];
-        Vector pull = ZERO;
-        for (int j = 0; j < i; j++) {
-            double force = pullFrom(positions[j], pos, re);
-            pull = pull.plus(positions[j].minus(pos).mul(force));
-        }
-        for (int j = i + 1; j < COUNT; j++) {
-            double force = pullFrom(positions[j], pos, re);
-            pull = pull.plus(positions[j].minus(pos).mul(force));
-        }
-        Vector heightVector = new Vector(0, pos.y() + yBound, 0);
-        double height = heightVector.length();
-        double groundPull = gravityWell.times(re.weight() / 10_000) / height * height;
-        return pull.plus(heightVector.mul(groundPull));
+    private void setOpacity(int i) {
+        double distToOrigo = positions[i].length();
+        double dim = 1 - distToOrigo / worldSizeX;
+        materials[i].setDiffuseColor(res[i].rgb(dim, dim));
     }
 
     private void handleCollision(int i, int j) {
@@ -503,6 +456,46 @@ public class Main extends Application {
         }
     }
 
+    private Vector updateCollisionImpulse(Integer index, Vector v) {
+        Vector collisionImpulse = collisionImpulses[index];
+        collisionImpulses[index] = ZERO;
+        return v.plus(collisionImpulse);
+    }
+
+    private void moveCamera() {
+        double angle = 2 * Math.PI * cameraStep / CAMERA_STEPS;
+        double x = Math.sin(angle) * cameraLine.length();
+        double z = Math.cos(angle) * cameraLine.length();
+
+        // Move the camera along the circle around origin
+        camera.setTranslateX(x);
+        camera.setTranslateY(0);
+        camera.setTranslateZ(z);
+
+        // Compute yaw (rotation around Y axis) and pitch (rotation around X axis)
+        camera.setRotate(Math.toDegrees(Math.atan2(-x, -z)));
+
+        cameraStep = (cameraStep - 1) % CAMERA_STEPS;
+    }
+
+    private Vector updatePulls(int i) {
+        Vector pos = positions[i];
+        Re re = res[i];
+        Vector pull = ZERO;
+        for (int j = 0; j < i; j++) {
+            double force = pullFrom(positions[j], pos, re);
+            pull = pull.plus(positions[j].minus(pos).mul(force));
+        }
+        for (int j = i + 1; j < COUNT; j++) {
+            double force = pullFrom(positions[j], pos, re);
+            pull = pull.plus(positions[j].minus(pos).mul(force));
+        }
+        Vector heightVector = new Vector(0, pos.y() + yBound, 0);
+        double height = heightVector.length();
+        double groundPull = gravityWell.times(re.weight() / GRAVITY_WELL_SCALE) / height * height;
+        return pull.plus(heightVector.mul(groundPull));
+    }
+
     private double pullFrom(Vector sPos, Vector pos, Re re) {
         double distance = pos.distanceTo(sPos);
         return gravConstant.times(re.weight()) / (distance * distance);
@@ -523,6 +516,8 @@ public class Main extends Application {
     static Vector ZERO = new Vector();
 
     private static final int SLIZER_VERTICALSPACE = 60;
+
+    public static final int GRAVITY_WELL_SCALE = 10_000;
 
     private static Re.Color color(int i, int count) {
         double ratio = 1d * i / count;
