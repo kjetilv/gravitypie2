@@ -107,6 +107,13 @@ public class Main extends Application {
             collisionBrake.value(0.68d);
             wallBrake.value(0d);
             gravityWell.value(0d);
+        },
+        () -> {
+            gravConstant.value(.01021d);
+            airBrake.value(0.11d);
+            collisionBrake.value(.33d);
+            wallBrake.value(.06d);
+            gravityWell.value(0d);
         }
     );
 
@@ -137,6 +144,14 @@ public class Main extends Application {
     private final int yBound;
 
     private GraphicsDevice device;
+
+    private int movingLightStep;
+
+    private final double movingLightDistance;
+
+    private final PointLight movingLight1 = new PointLight(WHITE);
+
+    private final PointLight movingLight2 = new PointLight(WHITE);
 
     {
         GraphicsDevice[] devices = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
@@ -212,22 +227,24 @@ public class Main extends Application {
         Material blueMaterial = new PhongMaterial(GHOSTWHITE);
         origo.setMaterial(blueMaterial);
 
-        AmbientLight ambient = new AmbientLight(Color.color(.6, .6, .6));
+        AmbientLight ambient = new AmbientLight(Color.color(.4, .4, .4));
 
-        PointLight pl1 = new PointLight(WHITE);
+        PointLight pl1 = new PointLight(new Color(.75d, .75d, .75d, 1d));
         pl1.setTranslateX(-(.4 * worldSizeX));
         pl1.setTranslateY(.4 * worldSizeY);
         pl1.setTranslateZ(.5 * worldSizeX);
 
-        PointLight pl2 = new PointLight(WHITE);
+        PointLight pl2 = new PointLight(new Color(.75d, .75d, .75d, 1d));
         pl2.setTranslateX(.4 * worldSizeX);
         pl2.setTranslateY(-4 * worldSizeY);
         pl2.setTranslateZ(-.5 * worldSizeZ);
 
+        movingLightDistance = worldSizeX + 1.5;
+
         Group wireBox =
             Shapes.createWireBox(worldSizeX, worldSizeY, worldSizeZ);
         Stream<Node> nodeStream = Stream.concat(
-            Stream.of(ambient, pl1, pl2, origo, wireBox),
+            Stream.of(ambient, pl1, pl2, movingLight1, movingLight2, origo, wireBox),
             Arrays.stream(spheres)
         );
         List<Node> nodes = nodeStream.toList();
@@ -295,8 +312,9 @@ public class Main extends Application {
                         updateSlider();
                     }
                     case DOWN -> {
-                        int newIndex = (currentSlidableSlidouble - 1) % slidableSlidoubles.size();
-                        currentSlidableSlidouble = newIndex < 0 ? slidableSlidoubles.size() - 1 : newIndex;
+                        currentSlidableSlidouble = (currentSlidableSlidouble == 0
+                            ? slidableSlidoubles.size()
+                            : currentSlidableSlidouble) - 1;
                         updateSlider();
                     }
                     case S -> System.out.println(slidableSlidoubles.stream()
@@ -355,7 +373,21 @@ public class Main extends Application {
             setOpacity(i);
         }
 
+        moveLight();
+
         moveCamera();
+    }
+
+    private void moveLight() {
+        double movingLightAngle1 = 2 * Math.PI * movingLightStep / MOVING_LIGHT_STEPS;
+        double movingLightAngle2 = movingLightAngle1 + Math.PI;
+        movingLight1.setTranslateX(Math.sin(movingLightAngle1) * movingLightDistance);
+        movingLight1.setTranslateY(-100);
+        movingLight1.setTranslateZ(Math.cos(movingLightAngle1) * movingLightDistance);
+        movingLight2.setTranslateX(Math.sin(movingLightAngle2) * movingLightDistance);
+        movingLight2.setTranslateY(100);
+        movingLight2.setTranslateZ(Math.cos(movingLightAngle2) * movingLightDistance);
+        movingLightStep = (movingLightStep + 1) % MOVING_LIGHT_STEPS;
     }
 
     private void preset(int i) {
@@ -519,7 +551,7 @@ public class Main extends Application {
         return worldSizeZ * 0.4;
     }
 
-    static final int COUNT = 256;
+    static final int COUNT = 300;
 
     static final Range RE_RANGE = new Range(5, 50);
 
@@ -528,6 +560,8 @@ public class Main extends Application {
     static final double COLOUR_RANGE = 0.9;
 
     static Vector ZERO = new Vector();
+
+    private static final int MOVING_LIGHT_STEPS = 3600;
 
     private static final int SLIZER_VERTICALSPACE = 60;
 
