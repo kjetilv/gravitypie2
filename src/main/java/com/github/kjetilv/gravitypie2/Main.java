@@ -180,12 +180,16 @@ public class Main extends Application {
         res = objects(
             COUNT,
             i ->
-                new Re(
+            {
+                Re.Color color = color(i, COUNT);
+                return new Re(
                     10,
                     RE_RANGE.point(i, COUNT),
                     1L,
-                    color(i, COUNT)
-                ), Re.class
+                    color,
+                    color.brighten(.1d)
+                );
+            }, Re.class
         );
 
         positions = objects(
@@ -208,7 +212,7 @@ public class Main extends Application {
         Material blueMaterial = new PhongMaterial(GHOSTWHITE);
         origo.setMaterial(blueMaterial);
 
-        AmbientLight ambient = new AmbientLight(Color.color(.3, .3, 0.5));
+        AmbientLight ambient = new AmbientLight(Color.color(.6, .6, .6));
 
         PointLight pl1 = new PointLight(WHITE);
         pl1.setTranslateX(-(.4 * worldSizeX));
@@ -243,18 +247,6 @@ public class Main extends Application {
         preset(1);
     }
 
-    private PhongMaterial material(int i) {
-        PhongMaterial phong = new PhongMaterial();
-        phong.diffuseColorProperty().set(res[i].rgb(1, 1));
-        return phong;
-    }
-
-    private Sphere sphere(int i) {
-        Sphere sphere = new Sphere(res[i].radius());
-        sphere.setMaterial(materials[i]);
-        return sphere;
-    }
-
     @Override
     public void start(Stage stage) {
         slidableSlidouble.set(gravConstant);
@@ -269,6 +261,20 @@ public class Main extends Application {
         new SphereAnimationTimer(this::update).start();
     }
 
+    private PhongMaterial material(int i) {
+        PhongMaterial phong = new PhongMaterial();
+        Re.Color color = res[i].color();
+        phong.setDiffuseColor(color.rgb());
+        phong.setSpecularColor(color.brighten(.1).rgb());
+        return phong;
+    }
+
+    private Sphere sphere(int i) {
+        Sphere sphere = new Sphere(res[i].radius());
+        sphere.setMaterial(materials[i]);
+        return sphere;
+    }
+
     private StackPane buildRootStackPane(VBox sliderBox) {
         StackPane root = new StackPane(subScene, sliderBox);
         StackPane.setAlignment(sliderBox, BOTTOM_LEFT);
@@ -279,26 +285,28 @@ public class Main extends Application {
     private Scene setScene(StackPane root) {
         Scene scene = new Scene(root, worldSizeX, worldSizeY + 120, true);
         scene.setOnKeyPressed(event -> {
-            switch (event.getCode()) {
-                case UP -> currentSlidableSlidouble = (currentSlidableSlidouble + 1) % slidableSlidoubles.size();
-                case DOWN -> {
-                    int newIndex = (currentSlidableSlidouble - 1) % slidableSlidoubles.size();
-                    currentSlidableSlidouble = newIndex < 0 ? slidableSlidoubles.size() - 1 : newIndex;
-                }
-                case S -> {
-                    String summary = slidableSlidoubles.stream()
+            KeyCode code = event.getCode();
+            if (code.isDigitKey()) {
+                preset(code.getCode() - '0');
+            } else {
+                switch (code) {
+                    case UP -> {
+                        currentSlidableSlidouble = (currentSlidableSlidouble + 1) % slidableSlidoubles.size();
+                        updateSlider();
+                    }
+                    case DOWN -> {
+                        int newIndex = (currentSlidableSlidouble - 1) % slidableSlidoubles.size();
+                        currentSlidableSlidouble = newIndex < 0 ? slidableSlidoubles.size() - 1 : newIndex;
+                        updateSlider();
+                    }
+                    case S -> System.out.println(slidableSlidoubles.stream()
                         .map(Objects::toString)
-                        .collect(Collectors.joining(", "));
-                    System.out.println(summary);
-                }
-                case Q -> System.exit(0);
-                default -> {
-                    if (event.getCode().isDigitKey()) {
-                        preset(event.getCode().getCode() - '0');
+                        .collect(Collectors.joining(", ")));
+                    case Q -> System.exit(0);
+                    default -> {
                     }
                 }
             }
-            updateSlider();
         });
         return scene;
     }
@@ -369,10 +377,16 @@ public class Main extends Application {
         double r = res[i].radius();
 
         Vector vel = velocities[i];
-        double vx = vel.x(), vy = vel.y(), vz = vel.z();
-
         Vector pos = positions[i];
-        double px = pos.x(), py = pos.y(), pz = pos.z();
+
+        double
+            vx = vel.x(),
+            vy = vel.y(),
+            vz = vel.z();
+        double
+            px = pos.x(),
+            py = pos.y(),
+            pz = pos.z();
 
         boolean h = false;
 
@@ -414,17 +428,17 @@ public class Main extends Application {
     }
 
     private void moveSphere(int i) {
-        Vector p = positions[i];
-        Sphere s = spheres[i];
-        s.setTranslateX(p.x());
-        s.setTranslateY(p.y());
-        s.setTranslateZ(p.z());
+        Vector pos = positions[i];
+        Sphere sphere = spheres[i];
+        sphere.setTranslateX(pos.x());
+        sphere.setTranslateY(pos.y());
+        sphere.setTranslateZ(pos.z());
     }
 
     private void setOpacity(int i) {
         double distToOrigo = positions[i].length();
         double dim = 1 - distToOrigo / worldSizeX;
-        materials[i].setDiffuseColor(res[i].rgb(dim, dim));
+        materials[i].setDiffuseColor(res[i].toRgb(dim, dim));
     }
 
     private void handleCollision(int i, int j) {
@@ -502,7 +516,7 @@ public class Main extends Application {
     }
 
     private double randomRange() {
-        return worldSizeZ * 0.48;
+        return worldSizeZ * 0.4;
     }
 
     static final int COUNT = 256;
@@ -511,7 +525,7 @@ public class Main extends Application {
 
     static final int CAMERA_STEPS = 21600;
 
-    static final double COLOUR_RANGE = 0.85;
+    static final double COLOUR_RANGE = 0.9;
 
     static Vector ZERO = new Vector();
 
