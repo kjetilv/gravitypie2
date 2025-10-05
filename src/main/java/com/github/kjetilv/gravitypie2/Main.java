@@ -147,6 +147,10 @@ public class Main extends Application {
 
     private final Rectangle bounds;
 
+    private SphereAnimationTimer sphereAnimationTimer;
+
+    private Stage stage;
+
     {
         GraphicsDevice device = device();
         bounds = device.getDefaultConfiguration().getBounds();
@@ -250,7 +254,7 @@ public class Main extends Application {
         slider.setShowTickMarks(true);
         slider.setMajorTickUnit(0.1);
         slider.setMinorTickCount(5);
-        slider.setBlockIncrement(0.01);
+        slider.setBlockIncrement(0.005);
         slider.setPrefWidth(200);
 
         sliderBox.setPadding(new javafx.geometry.Insets(2));
@@ -259,6 +263,8 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
+        this.stage = stage;
+
         slidableSlidouble.set(gravConstant);
 
         // Update the constant when slider changes
@@ -266,9 +272,10 @@ public class Main extends Application {
 
         StackPane root = buildRootStackPane(sliderBox);
         Scene scene = setScene(root);
-        showStage(stage, scene);
+        showStage(this.stage, scene);
 
-        new SphereAnimationTimer(this::update).start();
+        sphereAnimationTimer = new SphereAnimationTimer(this::update);
+        sphereAnimationTimer.start();
     }
 
     private void transitionTo(
@@ -337,24 +344,25 @@ public class Main extends Application {
             KeyCode code = event.getCode();
             if (code.isDigitKey()) {
                 preset(code.getCode() - '0');
-            } else {
-                switch (code) {
-                    case UP -> {
-                        currentSlidableSlidouble = (currentSlidableSlidouble + 1) % slidableSlidoubles.size();
-                        updateSlider();
-                    }
-                    case DOWN -> {
-                        currentSlidableSlidouble = (currentSlidableSlidouble == 0
-                            ? slidableSlidoubles.size()
-                            : currentSlidableSlidouble) - 1;
-                        updateSlider();
-                    }
-                    case S -> System.out.println(slidableSlidoubles.stream()
-                        .map(Objects::toString)
-                        .collect(Collectors.joining(", ")));
-                    case Q -> System.exit(0);
-                    default -> {
-                    }
+                return;
+            }
+            switch (code) {
+                case UP -> {
+                    currentSlidableSlidouble = (currentSlidableSlidouble + 1) % slidableSlidoubles.size();
+                    updateSlider();
+                }
+                case DOWN -> {
+                    currentSlidableSlidouble = (currentSlidableSlidouble == 0
+                        ? slidableSlidoubles.size()
+                        : currentSlidableSlidouble) - 1;
+                    updateSlider();
+                }
+                case S -> System.out.println(slidableSlidoubles.stream()
+                    .map(Objects::toString)
+                    .collect(Collectors.joining(", ")));
+                case Q ->
+                    stage.close();
+                default -> {
                 }
             }
         });
