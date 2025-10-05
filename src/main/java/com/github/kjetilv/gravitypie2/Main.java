@@ -4,6 +4,7 @@ import module java.base;
 import module javafx.controls;
 import javafx.scene.control.Label;
 import javafx.scene.paint.Color;
+import javafx.util.Duration;
 
 import java.awt.*;
 import java.util.List;
@@ -36,8 +37,6 @@ public class Main extends Application {
 
     private final SubScene subScene;
 
-    private final String title;
-
     private final Slidouble gravConstant = new Slidouble("gravConstant");
 
     private final Slidouble airBrake = new Slidouble("airBrake");
@@ -58,64 +57,7 @@ public class Main extends Application {
         gravityWell
     );
 
-    private final List<Slidouble> zeroables = List.of(
-        airBrake,
-        collisionBrake,
-        wallBrake,
-        gravityWell
-    );
-
-    private final List<Runnable> presets = List.of(
-        () -> {
-            gravConstant.value(0d);
-            airBrake.value(1d);
-            collisionBrake.value(1d);
-            wallBrake.value(1d);
-            gravityWell.value(0d);
-        },
-        () -> {
-            gravConstant.value(.04d);
-            airBrake.value(.07d);
-            collisionBrake.value(.23d);
-            wallBrake.value(.32d);
-            gravityWell.value(0d);
-        },
-        () -> {
-            gravConstant.value(.01);
-            airBrake.value(.1d);
-            collisionBrake.value(0d);
-            wallBrake.value(.85d);
-            gravityWell.value(0d);
-        },
-        () -> {
-            gravConstant.value(.04512);
-            airBrake.value(.03);
-            collisionBrake.value(.71);
-            wallBrake.value(0d);
-            gravityWell.value(0d);
-        },
-        () -> {
-            gravConstant.value(0.15662d);
-            airBrake.value(.03d);
-            collisionBrake.value(0.94d);
-            wallBrake.value(0d);
-            gravityWell.value(0d);
-        },
-        () -> {
-            gravConstant.value(0.07);
-            airBrake.value(0d);
-            collisionBrake.value(0.68d);
-            wallBrake.value(0d);
-            gravityWell.value(0d);
-        },
-        () -> {
-            gravConstant.value(.01021d);
-            airBrake.value(0.11d);
-            collisionBrake.value(.33d);
-            wallBrake.value(.06d);
-            gravityWell.value(0d);
-        }
-    );
+    private final AtomicBoolean transitioning = new AtomicBoolean();
 
     private int currentSlidableSlidouble = 0;
 
@@ -128,6 +70,58 @@ public class Main extends Application {
     private final VBox sliderBox = new VBox(2, label, slider);
 
     private final SlidoubleListener slidoubleListener = new SlidoubleListener(label, slider, slidableSlidouble);
+
+    private final List<Runnable> presets = List.of(
+        () -> transitionTo(
+            0d,
+            1d,
+            0d,
+            1d,
+            0d
+        ),
+        () -> transitionTo(
+            .04d,
+            .07d,
+            .23d,
+            .32d,
+            0d
+        ),
+        () -> transitionTo(
+            .01,
+            .1d,
+            0d,
+            .85d,
+            0d
+        ),
+        () -> transitionTo(
+            .04512,
+            .03,
+            .71,
+            0d,
+            0d
+        ),
+        () -> transitionTo(
+            0.15662d,
+            .03d,
+            0.94d,
+            0d,
+            0d
+        ),
+        () -> transitionTo(
+            0.07,
+            0d,
+            0.68d,
+            0d,
+            0d
+        ),
+        () -> transitionTo(
+            .01021d,
+            0.11d,
+            .33d,
+            .06d,
+            0d
+        )
+    );
 
     private final int worldSizeX;
 
@@ -143,8 +137,6 @@ public class Main extends Application {
 
     private final int yBound;
 
-    private GraphicsDevice device;
-
     private int movingLightStep;
 
     private final double movingLightDistance;
@@ -153,13 +145,11 @@ public class Main extends Application {
 
     private final PointLight movingLight2 = new PointLight(WHITE);
 
+    private final Rectangle bounds;
+
     {
-        GraphicsDevice[] devices = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
-        device = Arrays.stream(
-                devices
-            ).max(Comparator.comparing(graphicsDevice ->
-                graphicsDevice.getDisplayMode().getWidth()))
-            .orElseThrow();
+        GraphicsDevice device = device();
+        bounds = device.getDefaultConfiguration().getBounds();
 
         worldSizeX = 75 * device.getDisplayMode().getWidth() / 100;
         worldSizeZ = worldSizeX;
@@ -170,36 +160,19 @@ public class Main extends Application {
         yBound = worldSizeY / 2;
 
         cameraLine = new Vector(0, 0, -2 * worldSizeZ);
-
-        label.setTextFill(BLACK);
-
-        camera.setNearClip(1);
-        camera.setFarClip(5 * worldSizeZ);
-        camera.setRotationAxis(Y_AXIS);
-        camera.setRotate(0);
-
-        slider.setShowTickLabels(true);
-        slider.setShowTickMarks(true);
-        slider.setMajorTickUnit(0.1);
-        slider.setMinorTickCount(5);
-        slider.setBlockIncrement(0.01);
-        slider.setPrefWidth(200);
-
-        sliderBox.setPadding(new javafx.geometry.Insets(2));
-        sliderBox.setStyle("-fx-background-color: rgba(0, 0, 0, 0); -fx-background-radius: 5;");
     }
 
     public Main() {
-        this.title = "Stars";
+        List<Re.Color> list = Shapes.colors(8)
+            .toList();
 
         res = objects(
             COUNT,
-            i ->
-            {
-                Re.Color color = color(i, COUNT);
+            i -> {
+                Re.Color color = Shapes.color(i, COUNT);
                 return new Re(
                     10,
-                    RE_RANGE.point(i, COUNT),
+                    RE_RANGE.scale(i, COUNT),
                     1L,
                     color,
                     color.brighten(.1d)
@@ -265,6 +238,26 @@ public class Main extends Application {
     }
 
     @Override
+    public void init() {
+        label.setTextFill(BLACK);
+
+        camera.setNearClip(1);
+        camera.setFarClip(5 * worldSizeZ);
+        camera.setRotationAxis(Y_AXIS);
+        camera.setRotate(0);
+
+        slider.setShowTickLabels(true);
+        slider.setShowTickMarks(true);
+        slider.setMajorTickUnit(0.1);
+        slider.setMinorTickCount(5);
+        slider.setBlockIncrement(0.01);
+        slider.setPrefWidth(200);
+
+        sliderBox.setPadding(new javafx.geometry.Insets(2));
+        sliderBox.setStyle("-fx-background-color: rgba(0, 0, 0, 0); -fx-background-radius: 5;");
+    }
+
+    @Override
     public void start(Stage stage) {
         slidableSlidouble.set(gravConstant);
 
@@ -276,6 +269,45 @@ public class Main extends Application {
         showStage(stage, scene);
 
         new SphereAnimationTimer(this::update).start();
+    }
+
+    private void transitionTo(
+        double gravTo,
+        double airTo,
+        double collisionTo,
+        double wallTo,
+        double wellTo
+    ) {
+        if (transitioning.compareAndSet(false, true)) {
+            new Transition() {
+
+                private final double gravFrom = gravConstant.value();
+
+                private final double airFrom = airBrake.value();
+
+                private final double collisionFrom = collisionBrake.value();
+
+                private final double wallFrom = wallBrake.value();
+
+                private final double wellFrom = gravityWell.value();
+
+                {
+                    setCycleDuration(Duration.millis(250));
+                    setInterpolator(Interpolator.EASE_OUT);
+                    setOnFinished(_ -> transitioning.set(false));
+                }
+
+                @Override
+                protected void interpolate(double frac) {
+                    gravConstant.value(gravFrom + frac * (gravTo - gravFrom));
+                    airBrake.value(airFrom + frac * (airTo - airFrom));
+                    collisionBrake.value(collisionFrom + frac * (collisionTo - collisionFrom));
+                    wallBrake.value(wallFrom + frac * (wallTo - wallFrom));
+                    gravityWell.value(wellFrom + frac * (wellTo - wellFrom));
+                    slidoubleListener.refresh();
+                }
+            }.play();
+        }
     }
 
     private PhongMaterial material(int i) {
@@ -330,11 +362,10 @@ public class Main extends Application {
     }
 
     private void showStage(Stage stage, Scene scene) {
-        stage.setTitle(title);
+        stage.setTitle(TITLE);
         stage.setScene(scene);
         stage.setResizable(true);
 
-        Rectangle bounds = device.getDefaultConfiguration().getBounds();
         stage.setX(bounds.getX() + (bounds.getWidth() - worldSizeX) / 2);
         stage.setY(bounds.getY() + (bounds.getHeight() - (worldSizeY + SLIZER_VERTICALSPACE)) / 2);
 
@@ -557,37 +588,25 @@ public class Main extends Application {
 
     static final int CAMERA_STEPS = 21600;
 
-    static final double COLOUR_RANGE = 0.9;
+    private static final String TITLE = "Stars";
 
-    static Vector ZERO = new Vector();
+    private static final Vector ZERO = new Vector();
 
     private static final int MOVING_LIGHT_STEPS = 3600;
 
     private static final int SLIZER_VERTICALSPACE = 60;
 
-    private static Re.Color color(int i, int count) {
-        double ratio = 1d * i / count;
-        double angle = ratio * 3 * Math.PI;
-
-        double r = Math.sin(angle);
-        double g = Math.cos(angle + Math.PI / 2);
-        double b = Math.cos(angle + Math.PI);
-        return new Re.Color(
-            adjust(r),
-            adjust(g),
-            adjust(b),
-            .99d
-        );
-    }
-
-    private static double adjust(double r) {
-        double raw = Math.max(0, r);
-        double inRange = raw * COLOUR_RANGE;
-        return 1.0 - COLOUR_RANGE + inRange;
+    private static GraphicsDevice device() {
+        GraphicsDevice[] devices = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
+        return Arrays.stream(
+                devices
+            ).max(Comparator.comparing(graphicsDevice ->
+                graphicsDevice.getDisplayMode().getWidth()))
+            .orElseThrow();
     }
 
     private static Vector[] zeroes(int count) {
-        return objects(count, _ -> new Vector(), Vector.class);
+        return objects(count, _ -> ZERO, Vector.class);
     }
 
     @SuppressWarnings("unchecked")

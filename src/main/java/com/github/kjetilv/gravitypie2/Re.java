@@ -18,6 +18,31 @@ record Re(
 
     record Color(double r, double g, double b, double opacity) {
 
+        static Color r(double r) {
+            return new Color(r, 0d, 0d);
+        }
+
+        static Color g(double g) {
+            return new Color(0d, g, 0d);
+        }
+
+        static Color b(double b) {
+            return new Color(0d, 0d, b);
+        }
+
+        Color(double b, double g, double r) {
+            this(r, g, b, 1d);
+        }
+
+        public Color add(Color c) {
+            return new Color(
+                Math.min(1d, r + c.r()),
+                Math.min(1d, g + c.g()),
+                Math.min(1d, b + c.b()),
+                Math.min(1d, (opacity + c.opacity()) / 2)
+            );
+        }
+
         public Color brighten(double v) {
             return new Color(
                 adjust(r, v),
@@ -43,6 +68,11 @@ record Re(
         private static double adjust(double color, double adjust) {
             double headroom = 1 - color;
             return color + Math.min(1d, adjust) * headroom;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("r%.3f g%.3f b%.3f", r, g, b);
         }
     }
 }
